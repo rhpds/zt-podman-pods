@@ -1,0 +1,9 @@
+---
+name: modules
+version: master
+
+asciidoc:
+  attributes:
+    lab_name: "Create and Manage Podman Pods"
+    release-version: master
+    page-pagination: true

@@ -1,0 +1,21 @@
+---
+antora:
+  name: modules
+  dir: www
+  modules:
+    - name: "01-step1"
+      label: "Step1"
+      solveButton: true
+    - name: "02-step2"
+      label: "Step2"
+      solveButton: true
+    - name: "03-step3"
+      label: "Step3"
+      solveButton: true
+    - name: "04-step4"
+      label: "Step4"
+      solveButton: true
+
+tabs:
+  - name: ">_ terminal"
+    url: /wetty
