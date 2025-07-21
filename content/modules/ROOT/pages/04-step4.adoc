@@ -4,7 +4,7 @@ Quadlet is a systemd generator, that will take your pod definition, and
 register it as a service in systemd. We have provided a quadlet pod
 defintion for you.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 cat my-networked-pod.kube
 ----
@@ -21,14 +21,14 @@ makes it clean for this lab.
 
 Let’s copy the files into place.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 cp ~/my-networked-pod.yaml /etc/containers/systemd
 ----
 
 And then
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 cp ~/my-networked-pod.kube /etc/containers/systemd
 ----
@@ -36,7 +36,7 @@ cp ~/my-networked-pod.kube /etc/containers/systemd
 Now, if we reload systemd, quadlet will generate a service unit for our
 pod. You can also test the generation using quadlet in a dry-run.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 /usr/libexec/podman/quadlet -dryrun
 ----
@@ -53,7 +53,7 @@ is started using systemd.
 
 This looks fine, so let’s get this definiteion in place.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 systemctl daemon-reload
 ----
@@ -61,14 +61,14 @@ systemctl daemon-reload
 Now we can start the service up, but first, let’s check podman, and make
 sure we dont already have our pod running.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod ps
 ----
 
 Looks good, Let’s start our pod up.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 systemctl start my-networked-pod.service
 ----
@@ -76,14 +76,14 @@ systemctl start my-networked-pod.service
 This should go and download any container images that are neccessary,
 and then start up our pod.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 systemctl status my-networked-pod.service
 ----
 
 And
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod ps
 ----
