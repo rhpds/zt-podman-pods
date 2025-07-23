@@ -6,48 +6,46 @@ and `+podman play+`.
 
 Let’s generate a definition for your newly networked pod.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman generate kube my-networked-pod > my-networked-pod.yaml
 ----
 
 Now, we can see what we generated
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 cat my-networked-pod.yaml
 ----
 
 Now, if we stop, and remove our pod.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod stop my-networked-pod && podman pod rm my-networked-pod
 ----
 
 We can re-create it easily with podman play.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman play kube my-networked-pod.yaml
 ----
 
-____
-_NOTE_: This feature of podman works on other items as well, you can,
+NOTE: This feature of podman works on other items as well, you can,
 for instance, define a volume and use podman generate to store the
 volume definition as a yaml file. Then re-create it on another system
 using podman play.
-____
 
 Now, if we check on `+podman pod ps+` and `+podman ps+` we will see a
 new pod, and container within it.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod ps
 ----
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman ps
 ----
@@ -56,7 +54,7 @@ Now, if you try your curl command from earlier, you should get your test
 site just as before. You can see how this is a great way to save the
 deployment information and re-deploy quickly.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 curl http://127.0.0.1:8080
 ----

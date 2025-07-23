@@ -9,7 +9,7 @@ The feature we will be working with is specific to Podman version 4 and
 newer, so first let’s check that podman 4.0.x or newer is installed on
 the system.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman --version
 ----
@@ -21,7 +21,7 @@ You should see output similar to this:
 A pod within podman is a way of grouping containers that make up
 services. We can create a pod easily, with the following command.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod create --name my-pod
 ----
@@ -31,7 +31,7 @@ You should see output similar to this:
 Now we can create a container within that pod simply by tellig podman
 what pod to create the container in.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman run --pod my-pod -d --name my-httpd httpd
 ----
@@ -40,7 +40,7 @@ Again, you should see output similar to this:
 
 Now, we can see that our container is running with
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman ps
 ----
@@ -51,7 +51,7 @@ That is a special container that runs our pod. We can see that the pod
 is up and running, with two containers, even though we only started a
 single container inside of it.
 
-[source,bash,run]
+[source,bash,run,subs=attributes+]
 ----
 podman pod ps
 ----
