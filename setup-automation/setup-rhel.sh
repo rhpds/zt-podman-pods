@@ -16,8 +16,11 @@ touch $LOG
 
 echo "Installing Podman" >> $LOG
 dnf -y install container-tools
+pushd /tmp
 podman pull docker.io/httpd
-podman pull registry.access.redhat.com/ubi9/ubi
+sudo -u rhel podman pull docker.io/httpd
+sudo -u rhel podman pull registry.access.redhat.com/ubi9/ubi
+popd
 
 #Create a done file to signal we have finished
 touch ${LOG}.done

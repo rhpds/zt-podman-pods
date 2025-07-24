@@ -18,6 +18,33 @@ Now, we can see what we generated
 cat my-networked-pod.yaml
 ----
 
+[source,text]
+----
+[rhel@rhel ~]$ cat my-networked-pod.yaml
+# Save the output of this file and use kubectl create -f to import
+# it into Kubernetes.
+#
+# Created with podman-5.4.0
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    io.kubernetes.cri-o.SandboxID/my-networked-httpd: 0cb63867153a268ae9025232fc1fa9695a05b2663d2aab32102ee55097f6e7cf
+  creationTimestamp: "2025-07-24T14:04:34Z"
+  labels:
+    app: my-networked-pod
+  name: my-networked-pod
+spec:
+  containers:
+  - image: docker.io/library/httpd:latest
+    name: my-networked-httpd
+    ports:
+    - containerPort: 80
+      hostPort: 8080
+
+[rhel@rhel ~]$ 
+----
+
 Now, if we stop, and remove our pod.
 
 [source,bash,run,subs=attributes+]
@@ -39,16 +66,42 @@ using podman play.
 
 Now, if we check on `+podman pod ps+` and `+podman ps+` we will see a
 new pod, and container within it.
+[source,text]
+----
+[rhel@rhel ~]$ podman play kube my-networked-pod.yaml
+Pod:
+b13f7e5d39279844d03c1ade870bf4dc9a4788d7b4867b3bbfd18c7950ea2de2
+Container:
+0fa0dc156b996aca25414a1aea26acf6a4c3e980d0c32328765a9205f964897b
+
+[rhel@rhel ~]$
+----
 
 [source,bash,run,subs=attributes+]
 ----
 podman pod ps
+----
+[source,text]
+----
+[rhel@rhel ~]$ podman pod ps
+POD ID        NAME              STATUS      CREATED        INFRA ID      # OF CONTAINERS
+b13f7e5d3927  my-networked-pod  Running     2 minutes ago  5ea2c8a6a42a  2
+[rhel@rhel ~]$
 ----
 
 [source,bash,run,subs=attributes+]
 ----
 podman ps
 ----
+[source,text]
+----
+[rhel@rhel ~]$ podman ps
+CONTAINER ID  IMAGE                                    COMMAND           CREATED        STATUS        PORTS                 NAMES
+5ea2c8a6a42a  localhost/podman-pause:5.4.0-1750809600                    2 minutes ago  Up 2 minutes  0.0.0.0:8080->80/tcp  b13f7e5d3927-infra
+0fa0dc156b99  docker.io/library/httpd:latest           httpd-foreground  2 minutes ago  Up 2 minutes  0.0.0.0:8080->80/tcp  my-networked-pod-my-networked-httpd
+[rhel@rhel ~]$ 
+----
+
 
 Now, if you try your curl command from earlier, you should get your test
 site just as before. You can see how this is a great way to save the
@@ -57,6 +110,12 @@ deployment information and re-deploy quickly.
 [source,bash,run,subs=attributes+]
 ----
 curl http://127.0.0.1:8080
+----
+[source,text]
+----
+[rhel@rhel ~]$ curl http://127.0.0.1:8080
+<html><body><h1>It works!</h1></body></html>
+[rhel@rhel ~]$
 ----
 
 In the next step, we’re going a little deeper into operationalizing your

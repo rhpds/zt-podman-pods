@@ -1,2 +1,22 @@
 #!/bin/sh
 echo "Starting module called 04-step4" >> /tmp/progress.log
+podman pod stop --all && podman pod rm --all
+cat << EOF >> /home/rhel/my-networked-pod.kube
+[Install]
+WantedBy=default.target
+
+[Unit]
+# You can use standard unit options to control the start-up order of your pod. 
+# Such as:
+#After=
+#Requires=
+
+[Kube]
+# In this section you can define several things
+# here we are simply calling the kube yaml we generated with podman
+Yaml=/etc/containers/systemd/my-networked-pod.yaml
+
+#We also need to define the ports that our pod maps int, just as we do a the pod level
+PublishPort=8080:80
+EOF
+

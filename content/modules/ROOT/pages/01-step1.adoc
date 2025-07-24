@@ -15,6 +15,10 @@ podman --version
 ----
 
 You should see output similar to this:
+[source,text]
+----
+podman version 5.4.0
+----
 
 == Introduction to Podman Pods
 
@@ -27,6 +31,12 @@ podman pod create --name my-pod
 ----
 
 You should see output similar to this:
+[source,text]
+----
+[rhel@rhel ~]$ podman pod create --name my-pod
+9abe9e47a2a4eda4fa9bd5c329acf0187d91f9ff0c16ab49d1ceb173c8e84cc8
+[rhel@rhel ~]$ 
+----
 
 Now we can create a container within that pod simply by tellig podman
 what pod to create the container in.
@@ -37,6 +47,12 @@ podman run --pod my-pod -d --name my-httpd httpd
 ----
 
 Again, you should see output similar to this:
+[source,text]
+----
+[rhel@rhel ~]$ podman run --pod my-pod -d --name my-httpd httpd
+04446f8062d6bea945b6b6a23743203f7629bf8d1cf7be15def1dbafe984c401
+[rhel@rhel ~]$ 
+----
 
 Now, we can see that our container is running with
 
@@ -44,8 +60,16 @@ Now, we can see that our container is running with
 ----
 podman ps
 ----
+[source,text]
+----
+[rhel@rhel ~]$ podman ps
+CONTAINER ID  IMAGE                                    COMMAND           CREATED             STATUS             PORTS       NAMES
+672a12919c13  localhost/podman-pause:5.4.0-1750809600                    5 minutes ago       Up About a minute              9abe9e47a2a4-infra
+04446f8062d6  docker.io/library/httpd:latest           httpd-foreground  About a minute ago  Up About a minute  80/tcp      my-httpd
+[rhel@rhel ~]$
+----
 
-But what is that extra container? `+2d95aa4fdaee-infra+`
+But what is that extra container? `+9abe9e47a2a4-infra+`
 
 That is a special container that runs our pod. We can see that the pod
 is up and running, with two containers, even though we only started a
@@ -54,6 +78,13 @@ single container inside of it.
 [source,bash,run,subs=attributes+]
 ----
 podman pod ps
+----
+[source,text]
+----
+[rhel@rhel ~]$ podman pod ps
+POD ID        NAME        STATUS      CREATED        INFRA ID      # OF CONTAINERS
+9abe9e47a2a4  my-pod      Running     6 minutes ago  672a12919c13  2
+[rhel@rhel ~]$ 
 ----
 
 In the next step, we’ll work with networking within our pod.

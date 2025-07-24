@@ -24,11 +24,27 @@ notice that it says its listening on `+0.0.0.0:8080+`
 podman ps
 ----
 
+[source,text]
+----
+[rhel@rhel ~]$ podman ps
+CONTAINER ID  IMAGE                                    COMMAND           CREATED         STATUS         PORTS                 NAMES
+672a12919c13  localhost/podman-pause:5.4.0-1750809600                    11 minutes ago  Up 6 minutes                         9abe9e47a2a4-infra
+04446f8062d6  docker.io/library/httpd:latest           httpd-foreground  6 minutes ago   Up 6 minutes   80/tcp                my-httpd
+a27afba43bf9  docker.io/library/httpd:latest           httpd-foreground  51 seconds ago  Up 52 seconds  0.0.0.0:8080->80/tcp  my-bare-httpd
+[rhel@rhel ~]$
+----
+
 And we can even test that out with `+curl+`
 
 [source,bash,run,subs=attributes+]
 ----
 curl http://127.0.0.1:8080
+----
+[source,text]
+----
+[rhel@rhel ~]$ curl http://127.0.0.1:8080
+<html><body><h1>It works!</h1></body></html>
+[rhel@rhel ~]$
 ----
 
 Lets try to make a new httpd container, inside of our pod, that forwards
@@ -60,6 +76,13 @@ podman run -it --pod my-pod --rm registry.access.redhat.com/ubi9/ubi
 
 In this example, we’re running a container, interactively, insdie of our
 pod. You should get to a bash prompt inside of a RHEL UBI container.
+[source,text]
+----
+[rhel@rhel ~]$ podman stop my-bare-httpd
+my-bare-httpd
+[rhel@rhel ~]$ podman run -it --pod my-pod --rm registry.access.redhat.com/ubi9/ubi
+[root@my-pod /]# 
+----
 
 This container doesn’t run any services, but if we try to use curl on
 localhost, we’ll see that in fact we get a response!
@@ -69,6 +92,12 @@ localhost, we’ll see that in fact we get a response!
 curl http://127.0.0.1
 ----
 
+[source,text]
+----
+[root@my-pod /]# curl http://127.0.0.1
+<html><body><h1>It works!</h1></body></html>
+[root@my-pod /]# 
+----
 You can exit that shell with
 
 [source,bash,run,subs=attributes+]
@@ -109,10 +138,25 @@ even though we didnt specify that on the container.
 ----
 podman pod ps
 ----
+[source,text]
+----
+[rhel@rhel ~]$ podman pod ps
+POD ID        NAME              STATUS      CREATED         INFRA ID      # OF CONTAINERS
+e6171893814b  my-networked-pod  Running     14 seconds ago  0cb63867153a  2
+[rhel@rhel ~]$
+----
 
 [source,bash,run,subs=attributes+]
 ----
 podman ps
+----
+[source,text]
+----
+[rhel@rhel ~]$ podman ps
+CONTAINER ID  IMAGE                                    COMMAND           CREATED             STATUS             PORTS                 NAMES
+0cb63867153a  localhost/podman-pause:5.4.0-1750809600                    About a minute ago  Up About a minute  0.0.0.0:8080->80/tcp  e6171893814b-infra
+57e1ac2f658b  docker.io/library/httpd:latest           httpd-foreground  About a minute ago  Up About a minute  0.0.0.0:8080->80/tcp  my-networked-httpd
+[rhel@rhel ~]$
 ----
 
 And we should be able to test that with `+curl+` now.
@@ -120,6 +164,13 @@ And we should be able to test that with `+curl+` now.
 [source,bash,run,subs=attributes+]
 ----
 curl http://127.0.0.1:8080
+----
+
+[source,text]
+----
+[rhel@rhel ~]$ curl http://127.0.0.1:8080
+<html><body><h1>It works!</h1></body></html>
+[rhel@rhel ~]$ 
 ----
 
 In our next step, we’ll look at how to operationalize pod deployements

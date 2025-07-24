@@ -8,6 +8,28 @@ defintion for you.
 ----
 cat my-networked-pod.kube
 ----
+[source,text]
+----
+[rhel@rhel ~]$ cat my-networked-pod.kube
+[Install]
+WantedBy=default.target
+
+[Unit]
+# You can use standard unit options to control the start-up order of your pod. 
+# Such as:
+#After=
+#Requires=
+
+[Kube]
+# In this section you can define several things
+# here we are simply calling the kube yaml we generated with podman
+Yaml=/etc/containers/systemd/my-networked-pod.yaml
+
+#We also need to define the ports that our pod maps int, just as we do a the pod level
+PublishPort=8080:80
+[rhel@rhel ~]$
+----
+
 
 You can see the similarities in the above output, and a standard systemd
 unit file. You can add in start up options, ordering, and other systemd
@@ -19,18 +41,20 @@ yaml definition elsewhere if you would like, but this is also where the
 `+.kube+` quadlet defintion needs to be placed. Keeping them toghether
 makes it clean for this lab.
 
+NOTE: From this point on, we'll be deploying our pod using root privileges. It is possible to do this as a user-level systemd service, but that is outside of the scope of this lab.
+
 Let’s copy the files into place.
 
 [source,bash,run,subs=attributes+]
 ----
-cp ~/my-networked-pod.yaml /etc/containers/systemd
+sudo cp ~/my-networked-pod.yaml /etc/containers/systemd
 ----
 
 And then
 
 [source,bash,run,subs=attributes+]
 ----
-cp ~/my-networked-pod.kube /etc/containers/systemd
+sudo cp ~/my-networked-pod.kube /etc/containers/systemd
 ----
 
 Now, if we reload systemd, quadlet will generate a service unit for our
@@ -38,7 +62,46 @@ pod. You can also test the generation using quadlet in a dry-run.
 
 [source,bash,run,subs=attributes+]
 ----
-/usr/libexec/podman/quadlet -dryrun
+sudo /usr/libexec/podman/quadlet -dryrun
+----
+
+[source,text]
+----
+[rhel@rhel ~]$ sudo /usr/libexec/podman/quadlet -dryrun
+quadlet-generator[214865]: Loading source unit file /etc/containers/systemd/my-networked-pod.kube
+---my-networked-pod.service---
+[Install]
+WantedBy=default.target
+
+[Unit]
+Wants=network-online.target
+After=network-online.target
+SourcePath=/etc/containers/systemd/my-networked-pod.kube
+RequiresMountsFor=%t/containers
+
+# You can use standard unit options to control the start-up order of your pod.
+# Such as:
+#After=
+#Requires=
+
+[X-Kube]
+# In this section you can define several things
+# here we are simply calling the kube yaml we generated with podman
+Yaml=/etc/containers/systemd/my-networked-pod.yaml
+
+#We also need to define the ports that our pod maps int, just as we do a the pod level
+PublishPort=8080:80
+
+[Service]
+KillMode=mixed
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Type=notify
+NotifyAccess=all
+SyslogIdentifier=%N
+ExecStart=/usr/bin/podman kube play --replace --service-container=true --publish 8080:80 /etc/containers/systemd/my-networked-pod.yaml
+ExecStopPost=/usr/bin/podman kube down /etc/containers/systemd/my-networked-pod.yaml
+
+[rhel@rhel ~]$
 ----
 
 Using this dry run, you can see what qadlet will do when you reload
@@ -55,7 +118,7 @@ This looks fine, so let’s get this definiteion in place.
 
 [source,bash,run,subs=attributes+]
 ----
-systemctl daemon-reload
+sudo systemctl daemon-reload
 ----
 
 Now we can start the service up, but first, let’s check podman, and make
@@ -63,14 +126,14 @@ sure we dont already have our pod running.
 
 [source,bash,run,subs=attributes+]
 ----
-podman pod ps
+sudo podman pod ps
 ----
 
 Looks good, Let’s start our pod up.
 
 [source,bash,run,subs=attributes+]
 ----
-systemctl start my-networked-pod.service
+sudo systemctl start my-networked-pod.service
 ----
 
 This should go and download any container images that are neccessary,
@@ -78,14 +141,14 @@ and then start up our pod.
 
 [source,bash,run,subs=attributes+]
 ----
-systemctl status my-networked-pod.service
+sudo systemctl status my-networked-pod.service
 ----
 
 And
 
 [source,bash,run,subs=attributes+]
 ----
-podman pod ps
+sudo podman pod ps
 ----
 
 Now the `+my-networked-pod+` pod can be controlled via systemctl, and
