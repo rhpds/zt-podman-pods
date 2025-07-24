@@ -141,7 +141,7 @@ and then start up our pod.
 
 [source,bash,run,subs=attributes+]
 ----
-sudo systemctl status my-networked-pod.service
+sudo systemctl status my-networked-pod.service --no-pager
 ----
 
 And
@@ -153,3 +153,5 @@ sudo podman pod ps
 
 Now the `+my-networked-pod+` pod can be controlled via systemctl, and
 will even start up on system boot-up.
+
+So you can see how the tools included with Podman, and Quadlet, can help you take your containers from development, to production easily!  We hope you have enjoyed this lab.
