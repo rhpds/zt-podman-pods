@@ -20,7 +20,7 @@ lab:
     time_to_complete: "10"
     
   git_ref:
-    production: "prod"
+    production: "main"
 
 # DYNAMIC EXTRACTION SOURCES:
 # ===========================
