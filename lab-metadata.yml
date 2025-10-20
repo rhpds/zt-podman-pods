@@ -1,0 +1,53 @@
+# lab-metadata.yml
+# Single Point of Truth for Lab Information
+
+lab:
+  name: "Create and Manage Podman Pods"
+  shortname: "zt-podman-pods"
+  maintainer: "Nate Lager (nlager@redhat.com)" 
+  
+  description:
+    summary: "Learn how to create and manage Podman Pods"
+    goal: "After completing this scenario users will be able to create podman pods, create containers within those pods, and forward ports to the services those containers run."
+    concepts:
+      - Verify whether podman is installed on the system
+      - Create a pod in podman
+      - Run a container inside of a pod in podman
+      - Forward ports to containers within pods.
+      - Creating kubelet definitions from podman pods for easyier re-deployment
+      - Operationalizing a podman pod through systemd with Quadlet
+    use_case: "Create and Manage Podman Pods"
+    time_to_complete: "10"
+    
+  git_ref:
+    production: "prod"
+
+# DYNAMIC EXTRACTION SOURCES:
+# ===========================
+#
+# GENERATED FILES:
+# description.adoc: Generated from lab.description (goal, concepts, use_case)
+# README.md: Generated from configuration extraction (maintainer, summary, instances, networks, firewall)
+# dev.yaml: Generated using git_ref.development (defaults to "main" if not specified)
+# prod.yaml: Generated using git_ref.production (required)
+#
+# Example usage:
+# lab:
+#   name: "Red Hat OpenShift Networking Basics"      # Full name of the lab that appears in the catalog
+#   shortname: "zt-ocp-networking-basics"            # Shortname for the lab (used for catalog entry)
+#   maintainer: "Wilson Harris (wharris@redhat.com)" # Lab maintainer / developer
+#
+#   description:
+#     summary: "Learn the fundamentals of networking in Red Hat OpenShift" # Short summary of the lab
+#     goal: "Understand OpenShift networking concepts and configuration"   # Longer description of the lab's goal
+#     concepts:                                                            # List of concepts covered in the lab
+#       - "OpenShift Services"
+#       - "Routes and Ingress"
+#       - "Network Policies"
+#     use_case: "Configure networking for containerized applications"      # Use case for the lab
+#     time_to_complete: "10"                                               # time in minutes to complete the lab
+#   
+#   git_ref:
+#     production: "prod"    # Production git reference (required)
+#     # development: "dev"  # Optional: defaults to "main" if not specified
+#
