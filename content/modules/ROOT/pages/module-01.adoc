@@ -24,16 +24,16 @@ Podman 5 is the current major version on RHEL 10.
 
 == Run the Pieces as Separate Containers
 
-First, run the web frontend and the data store the way you have in previous labs — as two independent containers.
+First, run the web frontend and the data store the way you have in previous labs — as two independent containers. The `--rm` flag removes a container automatically when it stops, so these throwaway containers never need to be cleaned up by hand.
 
 [source,bash,role=execute]
 ----
-podman run -d --name web registry.access.redhat.com/hi/httpd:latest
+podman run -d --rm --name web registry.access.redhat.com/hi/httpd:latest
 ----
 
 [source,bash,role=execute]
 ----
-podman run -d --name store registry.access.redhat.com/hi/valkey:latest
+podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
 Check what is running:
@@ -70,7 +70,7 @@ A pod is a group of containers that share a single network namespace — one IP 
 
 [source,bash,role=execute]
 ----
-podman pod rm -f webapp 2>/dev/null; podman pod create --name webapp
+podman pod create --name webapp
 ----
 
 You now have an empty pod:
@@ -90,21 +90,23 @@ Notice the `# OF CONTAINERS` column: the pod already contains one container that
 
 == Run the Pieces Inside the Pod
 
-Adding a container to a pod takes a single flag. Remove the two standalone containers and run both pieces inside the pod instead.
+Adding a container to a pod takes a single flag. The two standalone containers are no longer needed — because they were started with `--rm`, stopping them removes them:
 
 [source,bash,role=execute]
 ----
-podman rm -f web store
+podman stop web store
+----
+
+Now run both pieces inside the pod:
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --rm --name web registry.access.redhat.com/hi/httpd:latest
 ----
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --name web registry.access.redhat.com/hi/httpd:latest
-----
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
+podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
 [source,bash,role=execute]
