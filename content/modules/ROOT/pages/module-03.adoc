@@ -61,28 +61,18 @@ EOF
 
 Read that configuration the way the store will: it binds to all interfaces but keeps protected mode on, and the only account that can connect is `report` — the default user is turned off entirely.
 
-== Rebuild the Pod on the Network
+== Join the Pod to the Network
 
-Recreate the pod one more time, this time joining `app-net`:
-
-[source,bash,role=execute]
-----
-podman pod stop webapp && podman pod rm webapp
-----
+The pod does not need to be rebuilt to join a network. A running pod can be connected to `app-net` in one command:
 
 [source,bash,role=execute]
 ----
-podman pod create --name webapp -p 8080:8080 --network app-net
+podman network connect app-net webapp
 ----
 
-Run the web frontend exactly as before:
+The pod never stopped. Port 8080 is still published and the web frontend is still serving — every container in the pod now reaches `app-net` through the infra container, and `app-net`'s DNS resolves their names.
 
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name web -v ~/webapp/index.html:/usr/local/apache2/htdocs/index.html:ro,Z -v ~/webapp/custom.conf:/etc/httpd/conf.d/custom.conf:ro,Z registry.access.redhat.com/hi/httpd:latest
-----
-
-Now the store, with its two configuration files mounted and the config file passed as an argument so it reads them at startup:
+The store, however, is still the one from the last module: started without its configuration files, listening only on localhost. Stop it — with `--rm`, that removes it — and start it again with its two configuration files mounted and the config file passed as an argument so it reads them at startup:
 
 [source,bash,role=execute]
 ----

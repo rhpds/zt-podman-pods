@@ -145,26 +145,19 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 7f6e5d4c3b2a  webapp      Running     3 minutes ago   c1d2e3f4a5b6  3
 ----
 
-For the full picture, inspect the pod:
+Inspect the pod, filtered to the state of the application:
 
 [source,bash,role=execute]
 ----
-podman pod inspect webapp
+podman pod inspect webapp --format '{{.State}} {{.NumContainers}}'
 ----
 
 [source,text]
 ----
-{
-     "Name": "webapp",
-     "Id": "7f6e5d4c3b2a...",
-     "State": "Running",
-     "InfraContainerID": "c1d2e3f4a5b6...",
-     "NumContainers": 3,
-     ...
-}
+Running 3
 ----
 
-The output is long. The fields worth noting now: `State`, `InfraContainerID`, and `NumContainers` — the pod, its namespace holder, and everything running inside it. You will use `podman pod inspect` again when the pod has ports and networks attached.
+Running, with three containers: the two services and the infra container. One line — the state of the whole application, pod included. You will use `podman pod inspect` again when the pod joins a network in the next module.
 
 Your application is now one unit: two services grouped into a pod, sharing a network view, started and stopped together.
 

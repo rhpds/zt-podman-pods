@@ -162,16 +162,21 @@ If something in this pod misbehaves, there is no logging into these containers t
 
 [source,bash,role=execute]
 ----
-podman logs web
+podman pod logs webapp
 ----
 
 [source,text]
 ----
+---2c3d4e5f6a7b---
+1:M 19 Oct 2026 * Ready to accept connections tcp
+---e4f5a6b7c8d9---
 [Mon Oct 19 2026] [mpm_event:notice] [pid 1] AH00489: Apache/2.4.69 (Unix) configured -- resuming normal operations
 [Mon Oct 19 2026] [core:notice] [pid 1] AH00094: HTTP/2.0 available
 ----
 
-The logs confirm the server started cleanly. For a service-level check, use the same one-off probe pattern from the start of this module — confirming the pieces are still talking after the rebuild:
+One command, and the logs of every container in the pod come back together — the store's startup line and the web frontend's. The pod is the debugging unit: when something in the webapp pod misbehaves, you look at the pod, not at its pieces one at a time.
+
+For a service-level check, use the same one-off probe pattern from the start of this module — confirming the pieces are still talking after the rebuild:
 
 [source,bash,role=execute]
 ----
