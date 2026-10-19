@@ -37,6 +37,9 @@
     delegate_to: localhost
     register: r_script_test
 
+  - name: Include secrets var
+    include_vars: ../config/secrets.yaml
+
   - name: Copy script file
     when: r_script_test.stat.exists
     copy:
@@ -49,6 +52,9 @@
     shell: "sh -x /tmp/setup-scripts/setup-{{ ansible_host }}.sh > /tmp/setup-scripts/setup-{{ ansible_host }}.log 2>&1"
     become: true
     register: r_result
+    environment:
+      ACTIVATION_KEY: "{{ rhelbu_activation_key }}"
+      ORG_ID: "{{ rhelbu_org_id }}"
 
   - name: Output script result
     ansible.builtin.debug:

@@ -1,0 +1,202 @@
+= A Dependent Service Outside the Pod
+
+Your application runs as one pod: the `web` frontend is reachable from the host, and the pieces talk over pod localhost. Now the scenario grows. A reporting job — another container, running outside the pod — needs to reach the store directly.
+
+In this module you will connect the pod to a user-defined network, configure the store to accept connections from beyond the pod, and watch data survive the container that wrote it.
+
+== The Problem: No Path and No Name
+
+Try what the reporting job would do. From a one-off container *outside* the pod, probe the store at localhost:
+
+[source,bash,role=execute]
+----
+podman run --rm --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h localhost ping
+----
+
+[source,text]
+----
+Could not connect to Redis at localhost:6379: Connection refused
+----
+
+Nothing is listening on the host's localhost — the store lives inside the pod, and the pod has only published port 8080. You could find the store's IP address with `podman inspect`, but that is the problem from the first module again: an address that changes every time the container is recreated.
+
+What the reporting job needs is a *name* that resolves to the store, on a network both can join.
+
+== Create a User-Defined Network
+
+So far every container has used Podman's default network. User-defined networks add two things the default does not provide: containers join by choice, and Podman runs DNS on the network so container names resolve.
+
+[source,bash,role=execute]
+----
+podman network create app-net
+----
+
+[source,bash,role=execute]
+----
+podman network ls
+----
+
+[source,text]
+----
+NETWORK ID    NAME        VERSION     PLUGINS
+2f3a4b5c6d7e  app-net     5.x         bridge,portmapping,firewall
+podman        podman      5.x         bridge,portmapping,firewall
+----
+
+`app-net` is empty for now. The `podman` network is the default that all of your containers have been using.
+
+== Configure the Store for Connections From Beyond the Pod
+
+The store is not ready to accept outside connections. By default it listens only on localhost and refuses everything else — the isolation doing its job. Accepting connections from the network is a deliberate change, made by configuration file.
+
+Create a `valkey.conf` that binds to the pod's network interfaces and enables persistent storage:
+
+[source,bash,role=execute]
+----
+cat > ~/webapp/valkey.conf <<'EOF'
+bind * -::*
+protected-mode yes
+appendonly yes
+dir /data
+aclfile /etc/valkey/users.acl
+EOF
+----
+
+And an access control list. The default user is disabled; a named user is created for the reporting job:
+
+[source,bash,role=execute]
+----
+cat > ~/webapp/users.acl <<'EOF'
+user default off
+user report on >reportpass ~* +@all
+EOF
+----
+
+Read that configuration the way the store will: it binds to all interfaces but keeps protected mode on, it persists writes to `/data`, and the only account that can connect is `report` — the default user is turned off entirely.
+
+== Rebuild the Pod on the Network
+
+Recreate the pod one more time, this time joining `app-net`:
+
+[source,bash,role=execute]
+----
+podman pod stop webapp && podman pod rm webapp
+----
+
+[source,bash,role=execute]
+----
+podman pod create --name webapp -p 8080:8080 --network app-net
+----
+
+Run the web frontend exactly as before:
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name web -v ~/webapp/index.html:/usr/local/apache2/htdocs/index.html:ro,Z -v ~/webapp/custom.conf:/etc/httpd/conf.d/custom.conf:ro,Z registry.access.redhat.com/hi/httpd:latest
+----
+
+Now the store, with its configuration files and a persistent volume mounted:
+
+[source,bash,role=execute]
+----
+podman volume create app-data
+----
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z -v app-data:/data:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
+----
+
+The command after the image name is an argument to the container: the store reads its configuration from the file you mounted, not from its built-in defaults. Two config files and a volume, all applied at container start.
+
+== The Reporting Job Connects by Name
+
+The store is now on `app-net` with a name the network's DNS resolves. Run the reporting job's probe — a one-off client on the same network, outside the pod:
+
+[source,bash,role=execute]
+----
+podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass ping
+----
+
+[source,text]
+----
+PONG
+----
+
+Look at what happened:
+
+* The probe container is *outside the pod* — it joined `app-net` directly.
+* `-h store` resolved the store's *container name* through the network's DNS. No IP addresses.
+* The connection authenticated as the `report` user from the ACL file. The default user is disabled, so without those credentials the store refuses everything.
+
+No port was published for the store. The reporting job reaches it because it joined the same user-defined network — name-based service discovery between containers and pods, exactly the gap that chasing IP addresses could not close.
+
+Note what still works — the web frontend is unchanged, still reachable from the host through the pod's published port:
+
+[source,bash,role=execute]
+----
+curl -I http://localhost:8080
+----
+
+[source,text]
+----
+HTTP/1.1 200 OK
+...
+X-WebApp: podman-pods
+...
+----
+
+== Data Outlives the Container
+
+The store writes to the `app-data` volume. Prove the data survives the container that wrote it. First, put something in the store:
+
+[source,bash,role=execute]
+----
+podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass set last-run "module-03"
+----
+
+[source,text]
+----
+OK
+----
+
+Now remove the store container entirely — the pod keeps running, only the store goes away:
+
+[source,bash,role=execute]
+----
+podman rm -f store
+----
+
+The reporting job's data is gone with it? No — it was written to the volume, not the container's writable layer. Run the store again with the same command:
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z -v app-data:/data:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
+----
+
+And read the key back:
+
+[source,bash,role=execute]
+----
+podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass get last-run
+----
+
+[source,text]
+----
+"module-03"
+----
+
+The key survived the container. Containers are disposable — that is what makes them useful — and the data a service owns lives in a volume that the container mounts, not in the container itself.
+
+== One Unit, One Command
+
+The application is now complete: two services grouped into a pod, talking over pod localhost, reachable by name across a user-defined network, configured by files mounted at start, and backed by a volume that outlives its container.
+
+And because it is a pod, the whole thing comes down with one command:
+
+[source,bash,role=execute]
+----
+podman pod stop webapp && podman pod rm webapp
+----
+
+One command stops the infra container and every service in the pod — the pieces live and die together, which is exactly what "one application" means. The `app-data` volume stays behind; recreate the pod and the store mounts it again.

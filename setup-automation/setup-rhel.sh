@@ -1,47 +1,35 @@
-# Unregister and register the VM
+#!/bin/bash
+set -x
+trap 'echo "FATAL: setup failed at line ${LINENO}" >> /tmp/progress.log; exit 1' ERR
+
+echo "Adding wheel" > /root/post-run.log
+usermod -aG wheel rhel
+
+echo "Setup zt-podman-pods" > /tmp/progress.log
+chmod 666 /tmp/progress.log
+
+dnf -y remove katello-ca-consumer-* 2>/dev/null || true
 subscription-manager clean
-subscription-manager register --activationkey=12-5-22-instruqt --org=12451665 --force
+subscription-manager register --activationkey="${ACTIVATION_KEY}" --org="${ORG_ID}" --force
+dnf install -y git podman
 
-!#/bin/bash
-LOG=/root/post-run.log
+LIBDIR=/tmp/lab-lib-$$
+git clone --depth=1 https://github.com/rhel-labs/lab-setup "${LIBDIR}"
+. "${LIBDIR}/common.sh"
 
-# while [ ! -f /opt/instruqt/bootstrap/host-bootstrap-completed ]
-# do
-#    echo "Waiting for Instruqt to finish booting the VM"
-#    sleep 1
-# done
+echo "Packages installed" >> /tmp/progress.log
 
-# yum remove -y google-rhui-client-rhel8.noarch
-# yum clean all
-# subscription-manager config --rhsm.manage_repos=1
-# subscription-manager register --activationkey=${ACTIVATION_KEY} --org=12451665 --force
+# --- lab configuration ---
+# This lab pulls public images only — no private registry, no secrets beyond registration.
+# -------------------------
 
-touch $LOG
+# Pre-pull the lab images into the rhel user's storage
+pull_public_images rhel \
+    registry.access.redhat.com/hi/httpd:latest \
+    registry.access.redhat.com/hi/valkey:latest \
+    registry.access.redhat.com/hi/curl:latest
+echo "Lab images staged in rhel user storage" >> /tmp/progress.log
 
-echo "Installing Podman" >> $LOG
-dnf -y install container-tools
-pushd /tmp
-podman pull docker.io/httpd
-sudo -u rhel podman pull docker.io/httpd
-sudo -u rhel podman pull registry.access.redhat.com/ubi9/ubi
-popd
-
-#Create a done file to signal we have finished
-touch ${LOG}.done
-n=1
-GREEN='\033[0;32m' 
-NC='\033[0m' # No Color
-
-while [ ! -f ${LOG}.done ] ;
-do
-      if test "$n" = "1"
-      then
-	    clear
-            n=$(( n+1 ))	 # increments $n
-      else
-	    printf "."
-      fi
-      sleep 2
-done
-clear
-echo -e "${GREEN}Ready to start your scenario${NC}"
+cleanup_subscription
+cleanup_tmpfiles
+echo "Setup complete" >> /tmp/progress.log

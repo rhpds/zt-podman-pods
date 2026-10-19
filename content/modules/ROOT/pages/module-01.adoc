@@ -1,0 +1,169 @@
+= Grouping Containers into Pods
+
+Your web service is two pieces. There is a web frontend that serves pages, and a data store that holds its state. They are one application: they are deployed together, they fail together, and they talk to each other constantly.
+
+So far in this lab series you have worked with single containers. In this module you will deploy both pieces, see why running them as two independent containers is awkward, and group them into a pod.
+
+The images this lab uses come from Red Hat's hardened image catalog. They are minimal images: no shell, no package manager, running as non-root users on unprivileged ports. You configure them by mounting files, and you work with them from the outside — there is no logging into these containers.
+
+== Verify the Podman Installation
+
+Confirm the version of Podman on this system.
+
+[source,bash,role=execute]
+----
+podman --version
+----
+
+[source,text]
+----
+podman version 5.x.x
+----
+
+Podman 5 is the current major version on RHEL 10.
+
+== Run the Pieces as Separate Containers
+
+First, run the web frontend and the data store the way you have in previous labs — as two independent containers.
+
+[source,bash,role=execute]
+----
+podman run -d --name web registry.access.redhat.com/hi/httpd:latest
+----
+
+[source,bash,role=execute]
+----
+podman run -d --name store registry.access.redhat.com/hi/valkey:latest
+----
+
+Check what is running:
+
+[source,bash,role=execute]
+----
+podman ps
+----
+
+[source,text]
+----
+CONTAINER ID  IMAGE                                   COMMAND               CREATED         STATUS         PORTS       NAMES
+b1e2f3a4c5d6  registry.access.redhat.com/hi/httpd     httpd -DFOREGROUND    5 seconds ago   Up 5 seconds   8080/tcp    web
+9a8b7c6d5e4f  registry.access.redhat.com/hi/valkey    valkey-server         3 seconds ago   Up 3 seconds   6379/tcp    store
+----
+
+Two containers, two independent lifecycles. To connect them, each would need to find the other by IP address — addresses that change every time a container is recreated:
+
+[source,bash,role=execute]
+----
+podman inspect store --format '{{.NetworkSettings.IPAddress}}'
+----
+
+[source,text]
+----
+10.88.0.4
+----
+
+That address is assigned by Podman's network. Recreate the container and it will likely be different. Managing two separate units that must always find each other is exactly the kind of friction pods exist to remove.
+
+== Create a Pod
+
+A pod is a group of containers that share a single network namespace — one IP address, one localhost, one lifecycle.
+
+[source,bash,role=execute]
+----
+podman pod rm -f webapp 2>/dev/null; podman pod create --name webapp
+----
+
+You now have an empty pod:
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Created     3 seconds ago   c1d2e3f4a5b6  1
+----
+
+Notice the `# OF CONTAINERS` column: the pod already contains one container that you did not start.
+
+== Run the Pieces Inside the Pod
+
+Adding a container to a pod takes a single flag. Remove the two standalone containers and run both pieces inside the pod instead.
+
+[source,bash,role=execute]
+----
+podman rm -f web store
+----
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name web registry.access.redhat.com/hi/httpd:latest
+----
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
+----
+
+[source,bash,role=execute]
+----
+podman ps
+----
+
+[source,text]
+----
+CONTAINER ID  IMAGE                                   COMMAND               CREATED         STATUS         PORTS       NAMES
+e4f5a6b7c8d9  registry.access.redhat.com/hi/httpd     httpd -DFOREGROUND    8 seconds ago   Up 8 seconds   8080/tcp    web
+2c3d4e5f6a7b  registry.access.redhat.com/hi/valkey    valkey-server         6 seconds ago   Up 6 seconds   6379/tcp    store
+c1d2e3f4a5b6  localhost/podman-pause                  ...                   2 minutes ago   Up 2 minutes               7f6e5d4c3b2a-infra
+----
+
+== The Infra Container
+
+There is a third container: `7f6e5d4c3b2a-infra`, running an image called `podman-pause`.
+
+That is the infra container, and it *is* the pod. It runs a tiny process whose only job is to hold open the namespaces the pod's containers share — the network namespace in particular. Because `web` and `store` join the infra container's namespaces instead of creating their own, they share one IP address and one localhost.
+
+The infra container is why pods work: it exists for as long as the pod does, and every container in the pod comes and goes inside the boundaries it holds. When the pod stops, the infra container stops, and the shared network view disappears with it.
+
+== Inspect the Pod
+
+`podman pod ps` gives the summary view:
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Running     3 minutes ago   c1d2e3f4a5b6  3
+----
+
+For the full picture, inspect the pod:
+
+[source,bash,role=execute]
+----
+podman pod inspect webapp
+----
+
+[source,text]
+----
+{
+     "Name": "webapp",
+     "Id": "7f6e5d4c3b2a...",
+     "State": "Running",
+     "InfraContainerID": "c1d2e3f4a5b6...",
+     "NumContainers": 3,
+     ...
+}
+----
+
+The output is long. The fields worth noting now: `State`, `InfraContainerID`, and `NumContainers` — the pod, its namespace holder, and everything running inside it. You will use `podman pod inspect` again when the pod has ports and networks attached.
+
+Your application is now one unit: two services grouped into a pod, sharing a network view, started and stopped together.
+
+In the next module you will connect the two pieces to each other and make the web frontend reachable from outside.

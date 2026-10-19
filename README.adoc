@@ -1,0 +1,23 @@
+= Create and Manage Podman Pods
+
+A ZeroTouch / RHPDS showroom lab for novice systems administrators.
+
+Participants group a web frontend and its data store into a Podman pod, publish pod-level ports, connect the pod to a user-defined network, and persist service data across container replacement.
+
+== Lab journey
+
+* *module-01* — Grouping Containers into Pods (run two services as separate containers, then group them into a pod; the infra container explained)
+* *module-02* — Letting the Right Traffic In (pod-localhost between the pieces, pod-level port publishing, configure via mounted files, debug from outside)
+* *module-03* — A Dependent Service Outside the Pod (user-defined network, name-based DNS, access control via config file, persistent volumes)
+
+== Environment
+
+* 1 VM: `+rhel+` (RHEL 10.2 EUS), terminal access via wetty
+* Images (pulled during setup): `registry.access.redhat.com/hi/httpd:latest`, `registry.access.redhat.com/hi/valkey:latest`, `registry.access.redhat.com/hi/curl:latest`
+
+== Building locally
+
+* `./utilities/lab-build` — build the documentation
+* `./utilities/lab-serve` — serve the lab locally for preview
+* `./utilities/lab-stop` — stop the local server
+* `./utilities/lab-clean` — clean build artifacts
