@@ -8,7 +8,7 @@ lab:
   
   description:
     summary: "Learn how to group containers into Podman Pods and deploy a multi-service application as one unit"
-    goal: "After completing this scenario users will be able to group containers into pods, publish pod-level ports, connect pods to user-defined networks, and persist service data across container replacement."
+    goal: "Users leave this hands-on scenario with knowledge they can apply to their own container workloads: running a multi-service application as a single pod, letting its pieces talk over shared localhost, publishing only the ports that need to be reachable, connecting dependent services by name on a user-defined network, and keeping service data alive across container replacement."
     concepts:
       - "Create a pod in podman"
       - "Run containers inside a pod"

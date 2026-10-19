@@ -2,12 +2,12 @@
 
 A ZeroTouch / RHPDS showroom lab for novice systems administrators.
 
-Participants group a web frontend and its data store into a Podman pod, publish pod-level ports, connect the pod to a user-defined network, and persist service data across container replacement.
+Participants deploy a multi-service application as one pod and come away with knowledge they can apply to their own workloads: grouping a service's containers into a pod that shares one localhost, publishing only the ports that need to be reachable, reaching dependent services by name on a user-defined network, and keeping service data alive across container replacement.
 
 == Lab journey
 
 * *module-01* — Grouping Containers into Pods (run two services as separate containers, then group them into a pod; the infra container explained)
-* *module-02* — Letting the Right Traffic In (pod-localhost between the pieces, pod-level port publishing, configure via mounted files, debug from outside)
+* *module-02* — Letting the Right Traffic In (pod-localhost between the pieces, pod-level port publishing, content via a mounted file, debug from outside)
 * *module-03* — A Dependent Service Outside the Pod (user-defined network, name-based DNS, access control via config file, persistent volumes)
 
 == Environment
