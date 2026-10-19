@@ -109,46 +109,6 @@ curl http://localhost:8080
 </html>
 ----
 
-== Add the Configuration File
-
-The same mount pattern carries configuration. Add an Apache configuration file that sets a response header identifying the application:
-
-[source,bash,role=execute]
-----
-cat > ~/webapp/custom.conf <<'EOF'
-Header set X-WebApp "podman-pods"
-EOF
-----
-
-Stop the frontend — with `--rm`, that removes it — and start it again with the configuration file mounted alongside the content. One new flag: the config file goes to Apache's configuration drop-in directory instead of the document root.
-
-[source,bash,role=execute]
-----
-podman stop web
-----
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name web -v ~/webapp/index.html:/usr/local/apache2/htdocs/index.html:ro,Z -v ~/webapp/custom.conf:/etc/httpd/conf.d/custom.conf:ro,Z registry.access.redhat.com/hi/httpd:latest
-----
-
-Verify from outside — the page still serves, and the response headers now carry the application identifier:
-
-[source,bash,role=execute]
-----
-curl -I http://localhost:8080
-----
-
-[source,text]
-----
-HTTP/1.1 200 OK
-...
-X-WebApp: podman-pods
-...
-----
-
-The `X-WebApp` header comes from the `custom.conf` you wrote on the host and mounted into the container's configuration directory. Both the content and the configuration were applied by mounting files at container start — no shell, no edits inside the container.
-
 Start the data store again in the new pod:
 
 [source,bash,role=execute]
