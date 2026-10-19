@@ -2,7 +2,7 @@
 
 Your web service is two pieces. There is a web frontend that serves pages, and a data store that holds its state. They are one application: they are deployed together, they fail together, and they talk to each other constantly.
 
-So far in this lab series you have worked with single containers. But this is a two-container application, and running the two containers in the usual fashion does not let them talk to each other. Each container gets its own network view: its own localhost, its own address — an address that changes every time the container is recreated. In this module you will deploy both pieces the usual way, see why they cannot talk, and group them into a pod.
+This is a two-container application, and running the two containers in the usual fashion does not let them talk to each other. Each container gets its own network view: its own localhost, its own address — an address that changes every time the container is recreated. In this module you will deploy both pieces the usual way, see why they cannot talk, and group them into a pod.
 
 The images this lab uses come from Red Hat's hardened image catalog. They are minimal images: no shell, no package manager, running as non-root users on unprivileged ports. You configure them by mounting files, and you work with them from the outside — there is no logging into these containers.
 
@@ -24,7 +24,7 @@ Podman 5 is the current major version on RHEL 10.
 
 == Run the Pieces as Separate Containers
 
-First, run the web frontend and the data store the way you have in previous labs — as two independent containers. The `--rm` flag removes a container automatically when it stops, so these throwaway containers never need to be cleaned up by hand.
+First, run the web frontend and the data store in the usual fashion — as two independent containers. The `--rm` flag removes a container automatically when it stops, so these throwaway containers never need to be cleaned up by hand.
 
 [source,bash,role=execute]
 ----
