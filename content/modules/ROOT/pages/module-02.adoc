@@ -1,44 +1,24 @@
 = Letting the Right Traffic In
 
-Your application is now one pod with two pieces: the `web` frontend and the `store` data store. In this module you will prove the two pieces can talk to each other, see why nobody else can reach them yet, and open the pod to its users.
+Your application is one pod, and the pieces talk: the startup log showed the frontend reach the store over the shared localhost. But from outside, nothing gets in — the pod has published no ports. In this module you will open the pod to its users, and see how little needs to open.
 
-Access is deliberate. Each of these containers is a minimal image running as a non-root user on an unprivileged port, and none of them exposes anything by default. Everything that gets in gets in because you opened it.
+Access is deliberate. These images expose nothing by default. Everything that gets in gets in because you opened it.
 
-== The Pieces Talk Over Pod Localhost
+== The Pod Publishes Nothing
 
-Inside a pod, all containers share one localhost. The `store` listens on port 6379, so from anywhere inside the pod it is reachable at `localhost:6379`.
-
-Prove it with a one-off client container running inside the pod. The `valkey` image ships with the `valkey-cli` client, so the same image that runs the store can also act as its client:
+From the host, try the page:
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp --rm --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h localhost ping
+curl http://localhost:8000
 ----
 
 [source,text]
 ----
-PONG
+curl: (7) Failed to connect to localhost port 8000 after 0 ms: Couldn't connect to server
 ----
 
-The probe ran in its own container — a third container inside the pod, started, used, and removed in one command (`--rm`). It reached the store over pod localhost. This is how the two pieces of your application talk to each other: no IP addresses, no published ports, just the shared localhost the infra container provides.
-
-== Nobody Else Can Reach Them
-
-From the host, try the same thing:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8080
-----
-
-[source,text]
-----
-curl: (7) Failed to connect to localhost port 8080 after 0 ms: Couldn't connect to server
-----
-
-The `web` container is listening on 8080 — you can see it in `podman ps` — but the connection is refused. The web frontend is inside the pod, and the pod has not published any ports to the host.
-
-This is the isolation doing its job. A pod shares one network view internally and exposes nothing externally unless you tell it to. The same isolation that lets the pieces talk to each other privately keeps everything else out.
+The `web` container is listening on 8000 — but the connection is refused. The frontend is inside the pod, and the pod has not published any ports to the host. This is the isolation doing its job: a pod shares one network view internally and exposes nothing externally unless you tell it to.
 
 == Publish a Port at the Pod Level
 
@@ -49,105 +29,81 @@ Recreate the pod with a published port. First stop and remove the current pod �
 podman pod stop webapp && podman pod rm webapp
 ----
 
-Create the pod again, this time publishing port 8080 on the host to port 8080 in the pod:
+Create the pod again, this time publishing port 8000 on the host to port 8000 in the pod:
 
 [source,bash,role=execute]
 ----
-podman pod create --name webapp -p 8080:8080
+podman pod create --name webapp -p 8000:8000
 ----
 
 Note where the flag went: on the pod, not on any container. Port publishing is a property of the pod's network namespace — the infra container holds it, and every container in the pod shares it.
 
-== Prepare the Application Content
-
-Your frontend should serve something recognizable. These images have no shell and no package manager — there is no way to edit a running container. Files are prepared on the host and mounted in when the container starts.
-
-Create a working directory with a home page:
+== Run the Application
 
 [source,bash,role=execute]
 ----
-mkdir -p ~/webapp
+podman run --pod webapp -d --rm --name web webcounter-app:latest
 ----
-
-[source,bash,role=execute]
-----
-cat > ~/webapp/index.html <<'EOF'
-<!DOCTYPE html>
-<html>
-<head><title>Podman Pods</title></head>
-<body>
-<h1>Podman Pods</h1>
-<p>This page is served by the web container in the webapp pod.</p>
-</body>
-</html>
-EOF
-----
-
-Start the frontend with the home page mounted into its document root:
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name web -v ~/webapp/index.html:/usr/local/apache2/htdocs/index.html:ro,Z registry.access.redhat.com/hi/httpd:latest
-----
-
-From the host, the page is now served:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8080
-----
-
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>Podman Pods</title></head>
-<body>
-<h1>Podman Pods</h1>
-<p>This page is served by the web container in the webapp pod.</p>
-</body>
-</html>
-----
-
-Start the data store again in the new pod:
 
 [source,bash,role=execute]
 ----
 podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
-== Debug From Outside
-
-If something in this pod misbehaves, there is no logging into these containers to find out why — they have no shell. The debugging surface is outside the container: logs first.
+From the host, the page is now served:
 
 [source,bash,role=execute]
 ----
-podman pod logs webapp
+curl http://localhost:8000
 ----
 
 [source,text]
 ----
----2c3d4e5f6a7b---
-1:M 19 Oct 2026 * Ready to accept connections tcp
----e4f5a6b7c8d9---
-[Mon Oct 19 2026] [mpm_event:notice] [pid 1] AH00489: Apache/2.4.69 (Unix) configured -- resuming normal operations
-[Mon Oct 19 2026] [core:notice] [pid 1] AH00094: HTTP/2.0 available
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: 1, served from store at localhost:6379</p>
+</body>
+</html>
 ----
 
-One command, and the logs of every container in the pod come back together — the store's startup line and the web frontend's. The pod is the debugging unit: when something in the webapp pod misbehaves, you look at the pod, not at its pieces one at a time.
-
-For a service-level check, use the same one-off probe pattern from the start of this module — confirming the pieces are still talking after the rebuild:
+Load it again:
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp --rm --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h localhost ping
+curl http://localhost:8000
 ----
 
 [source,text]
 ----
-PONG
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: 2, served from store at localhost:6379</p>
+</body>
+</html>
 ----
 
-Logs and probes from outside. That is the debugging model for containers like these — and it works the same whether the container is healthy or not.
+Every page load is the frontend querying the store and incrementing the count: two containers in one pod, talking over the shared localhost, with the number to prove it. The store has no published port and no address you ever needed — the pieces talk privately, and the page is the evidence.
 
-Your users can now reach the web frontend, and the two pieces talk privately over pod localhost. In the next module, another system needs to reach the store — and it lives outside the pod.
+== Only the Right Port Opens
+
+The store lives in the same pod as a reachable service. Try it from the host anyway:
+
+[source,bash,role=execute]
+----
+curl http://localhost:6379
+----
+
+[source,text]
+----
+curl: (7) Failed to connect to localhost port 6379 after 0 ms: Couldn't connect to server
+----
+
+Only port 8000 was published. The store stays inside: the pod exposes exactly what you told it to — one port, the one the users need — no matter how many containers it holds. The same isolation you relaxed for the frontend, deliberately, at the pod level, is still keeping the store private.
+
+Your users can now reach the web frontend, and the two pieces talk privately behind it. A pod is one way to let two containers talk. In the next module, you will take the pod apart and let them talk by name instead.

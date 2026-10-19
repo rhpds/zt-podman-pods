@@ -1,214 +1,123 @@
-= A Dependent Service Outside the Pod
+= How Podman Networks Operate
 
-Your application runs as one pod: the `web` frontend is reachable from the host, and the pieces talk over pod localhost. Now the scenario grows. A reporting job — another container, running outside the pod — needs to reach the store directly.
+Your application ran as a pod: the pieces talked over the shared localhost, and the page was reachable on one published port. A pod is one way to let two containers talk. A network is the other. In this module you will run the same application without a pod, join the containers to a user-defined network, and watch the frontend find the store by name.
 
-In this module you will connect the pod to a user-defined network, configure the store to accept connections from beyond the pod, and watch data survive the container that wrote it.
+== Take the Pod Apart
 
-== The Problem: No Path and No Name
-
-Try what the reporting job would do. From a one-off container *outside* the pod, probe the store at localhost:
-
-[source,bash,role=execute]
-----
-podman run --rm --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h localhost ping
-----
-
-[source,text]
-----
-Could not connect to Redis at localhost:6379: Connection refused
-----
-
-Nothing is listening on the host's localhost — the store lives inside the pod, and the pod has only published port 8080. You could find the store's IP address with `podman inspect`, but that is the problem from the first module again: an address that changes every time the container is recreated.
-
-What the reporting job needs is a *name* that resolves to the store, on a network both can join.
-
-== Create a User-Defined Network
-
-So far every container has used Podman's default network. User-defined networks add two things the default does not provide: containers join by choice, and Podman runs DNS on the network so container names resolve.
-
-[source,bash,role=execute]
-----
-podman network create app-net
-----
-
-`app-net` is empty for now. The pod and the reporting job will join it in the steps ahead.
-
-== Configure the Store for Connections From Beyond the Pod
-
-The store is not ready to accept outside connections. By default it listens only on localhost and refuses everything else — the isolation doing its job. Accepting connections from the network is a deliberate change, made by configuration file.
-
-Create a `valkey.conf` that binds to the pod's network interfaces and enables persistent storage:
-
-[source,bash,role=execute]
-----
-cat > ~/webapp/valkey.conf <<'EOF'
-bind * -::*
-protected-mode yes
-appendonly yes
-aclfile /etc/valkey/users.acl
-EOF
-----
-
-And an access control list. The default user is disabled; a named user is created for the reporting job:
-
-[source,bash,role=execute]
-----
-cat > ~/webapp/users.acl <<'EOF'
-user default off
-user report on >reportpass ~* +@all
-EOF
-----
-
-Read that configuration the way the store will: it binds to all interfaces but keeps protected mode on, and the only account that can connect is `report` — the default user is turned off entirely.
-
-== Join the Pod to the Network
-
-The pod does not need to be rebuilt to join a network. A running pod can be connected to `app-net` in one command:
-
-[source,bash,role=execute]
-----
-podman network connect app-net webapp
-----
-
-The pod never stopped. Port 8080 is still published and the web frontend is still serving — every container in the pod now reaches `app-net` through the infra container, and `app-net`'s DNS resolves their names.
-
-The store, however, is still the one from the last module: started without its configuration files, listening only on localhost. Stop it — with `--rm`, that removes it — and start it again with its two configuration files mounted and the config file passed as an argument so it reads them at startup:
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
-----
-
-== The Reporting Job Connects by Name
-
-The store is now on `app-net` with a name the network's DNS resolves. Run the reporting job's probe — a one-off client on the same network, outside the pod:
-
-[source,bash,role=execute]
-----
-podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass ping
-----
-
-[source,text]
-----
-PONG
-----
-
-Look at what happened:
-
-* The probe container is *outside the pod* — it joined `app-net` directly.
-* `-h store` resolved the store's *container name* through the network's DNS. No IP addresses.
-* The connection authenticated as the `report` user from the ACL file. The default user is disabled, so without those credentials the store refuses everything.
-
-No port was published for the store. The reporting job reaches it because it joined the same user-defined network — name-based service discovery between containers and pods, exactly the gap that chasing IP addresses could not close.
-
-== The Data Does Not Survive Yet
-
-The reporting job writes data to the store. Put something in:
-
-[source,bash,role=execute]
-----
-podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass set last-run "module-03"
-----
-
-[source,text]
-----
-OK
-----
-
-Now remove the store container — with `--rm`, stopping it removes it. The pod keeps running; only the store goes away:
-
-[source,bash,role=execute]
-----
-podman stop store
-----
-
-Run the store again with the same command:
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
-----
-
-And read the key back:
-
-[source,bash,role=execute]
-----
-podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass get last-run
-----
-
-[source,text]
-----
-(empty array)
-----
-
-The key is gone. The store wrote it to its own writable layer, and that layer was deleted with the container. Containers are disposable — that is what makes them useful — but the data a service owns cannot live inside one.
-
-== Add a Persistent Volume
-
-A volume is Podman-managed storage that exists independently of any container. The store mounts it, the container goes away, the volume stays.
-
-[source,bash,role=execute]
-----
-podman volume create app-data
-----
-
-Stop the store and start it again with one new flag: the volume mounted where the store writes its data.
-
-[source,bash,role=execute]
-----
-podman stop store
-----
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z -v app-data:/data:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
-----
-
-Write the key again:
-
-[source,bash,role=execute]
-----
-podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass set last-run "module-03"
-----
-
-[source,text]
-----
-OK
-----
-
-Remove the store once more, and read the key back from a fresh container:
-
-[source,bash,role=execute]
-----
-podman stop store
-----
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name store -v ~/webapp/valkey.conf:/etc/valkey/valkey.conf:Z -v ~/webapp/users.acl:/etc/valkey/users.acl:Z -v app-data:/data:Z registry.access.redhat.com/hi/valkey:latest /etc/valkey/valkey.conf
-----
-
-[source,bash,role=execute]
-----
-podman run --rm --network app-net --entrypoint valkey-cli registry.access.redhat.com/hi/valkey:latest -h store --user report -a reportpass get last-run
-----
-
-[source,text]
-----
-"module-03"
-----
-
-The key survived the container this time. The difference is the volume: the store's data lives in `app-data`, which no container owns. That is how a disposable service keeps state.
-
-== One Unit, One Command
-
-The application is now complete: two services grouped into a pod, talking over pod localhost, reachable by name across a user-defined network, configured by files mounted at start, and backed by a volume that outlives its container.
-
-And because it is a pod, the whole thing comes down with one command:
+One command stops the infra container and every service in it:
 
 [source,bash,role=execute]
 ----
 podman pod stop webapp && podman pod rm webapp
 ----
 
-One command stops the infra container and every service in the pod — the pieces live and die together, which is exactly what "one application" means. The `app-data` volume stays behind; recreate the pod and the store mounts it again.
+The pieces lived and died together — that is what "one application" meant.
+
+== The Usual Fashion, Again
+
+Run the two pieces in the usual fashion — independent containers, no pod:
+
+[source,bash,role=execute]
+----
+podman run -d --rm --name web -p 8000:8000 webcounter-app:latest
+----
+
+[source,bash,role=execute]
+----
+podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+----
+
+From the host, the page:
+
+[source,bash,role=execute]
+----
+curl http://localhost:8000
+----
+
+[source,text]
+----
+<p>Page views: —</p>
+<p>The web frontend cannot reach its data store at localhost:6379.</p>
+----
+
+The same failure as the first module: without a pod, the frontend's `localhost` is its own container, and the store is not there. The frontend needs the store's address — and chasing addresses is the problem: they change every time a container is recreated. What it needs is a name that resolves, on a network both containers join.
+
+== Create a Network
+
+[source,bash,role=execute]
+----
+podman network create app-net
+----
+
+So far every container has used Podman's default network, which every container joins automatically. A user-defined network is different: containers join it by choice. Membership is what makes containers visible to each other.
+
+== Join the Pieces by Name
+
+Recreate both containers on the network. Because they were started with `--rm`, stopping them removes them:
+
+[source,bash,role=execute]
+----
+podman stop web store
+----
+
+Run the store on the network first:
+
+[source,bash,role=execute]
+----
+podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest
+----
+
+Now the frontend, on the same network, pointing at the store by its container name. One environment variable is all that changes:
+
+[source,bash,role=execute]
+----
+podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
+----
+
+From the host, the page is served — and it says where the store was found:
+
+[source,bash,role=execute]
+----
+curl http://localhost:8000
+----
+
+[source,text]
+----
+<p>Page views: 1, served from store at store:6379</p>
+----
+
+The frontend reached the store at `store:6379`. `store` is not an address — it is the container's name, resolved through the network's DNS. No pod, no shared localhost: the network is what let two containers find each other, and the name is how. The only difference from the failing run is one environment variable.
+
+== Who Is on the Network
+
+The network is an object you can inspect. Filter its output to the members:
+
+[source,bash,role=execute]
+----
+podman network inspect app-net --format '{{range .containers}}{{.name}} {{end}}'
+----
+
+[source,text]
+----
+store web
+----
+
+Both containers, listed by name — the same names the frontend resolved. The network's members are its communication boundary: containers on it can find each other by name, and containers off it cannot.
+
+== Clean Up
+
+The application is two containers on a network. Stopping them removes them — they were started with `--rm`:
+
+[source,bash,role=execute]
+----
+podman stop web store
+----
+
+The network stays behind until you remove it:
+
+[source,bash,role=execute]
+----
+podman network rm app-net
+----
+
+Two ways to let containers talk, one application: a pod gives its containers one localhost and one lifecycle; a network gives containers names and a boundary you join by choice. The same application ran both ways — the only difference was one environment variable.

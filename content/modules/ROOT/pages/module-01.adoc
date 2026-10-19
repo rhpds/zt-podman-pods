@@ -4,7 +4,7 @@ Your web service is two pieces. There is a web frontend that serves pages, and a
 
 This is a two-container application, and running the two containers in the usual fashion does not let them talk to each other. Each container gets its own network view: its own localhost, its own address — an address that changes every time the container is recreated. In this module you will deploy both pieces the usual way, see why they cannot talk, and group them into a pod.
 
-The images this lab uses come from Red Hat's hardened image catalog. They are minimal images: no shell, no package manager, running as non-root users on unprivileged ports. You configure them by mounting files, and you work with them from the outside — there is no logging into these containers.
+The images this lab uses are minimal: no shell, no package manager, running as non-root users on unprivileged ports. You configure them with environment variables, and you work with them from the outside — there is no logging into these containers.
 
 == Verify the Podman Installation
 
@@ -22,13 +22,13 @@ podman version 5.x.x
 
 Podman 5 is the current major version on RHEL 10.
 
-== Run the Pieces as Separate Containers
+== Run the Pieces in the Usual Fashion
 
 First, run the web frontend and the data store in the usual fashion — as two independent containers. The `--rm` flag removes a container automatically when it stops, so these throwaway containers never need to be cleaned up by hand.
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name web registry.access.redhat.com/hi/httpd:latest
+podman run -d --rm --name web -p 8000:8000 webcounter-app:latest
 ----
 
 [source,bash,role=execute]
@@ -45,24 +45,50 @@ podman ps
 
 [source,text]
 ----
-CONTAINER ID  IMAGE                                   COMMAND               CREATED         STATUS         PORTS       NAMES
-b1e2f3a4c5d6  registry.access.redhat.com/hi/httpd     httpd -DFOREGROUND    5 seconds ago   Up 5 seconds   8080/tcp    web
-9a8b7c6d5e4f  registry.access.redhat.com/hi/valkey    valkey-server         3 seconds ago   Up 3 seconds   6379/tcp    store
+CONTAINER ID  IMAGE                                   COMMAND          CREATED         STATUS         PORTS                     NAMES
+b1e2f3a4c5d6  webcounter-app                          gunicorn app.a   5 seconds ago   Up 5 seconds   0.0.0.0:8000->8000/tcp    web
+9a8b7c6d5e4f  registry.access.redhat.com/hi/valkey    valkey-server    3 seconds ago   Up 3 seconds   6379/tcp                  store
 ----
 
-Two containers, two independent lifecycles. To connect them, each would need to find the other by IP address — addresses that change every time a container is recreated:
+Two containers, both healthy, both running on this one machine.
+
+== The Pieces Cannot Talk
+
+From the host, load the page:
 
 [source,bash,role=execute]
 ----
-podman inspect store --format '{{.NetworkSettings.IPAddress}}'
+curl http://localhost:8000
 ----
 
 [source,text]
 ----
-10.88.0.4
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: —</p>
+<p>The web frontend cannot reach its data store at localhost:6379.</p>
+</body>
+</html>
 ----
 
-That address is assigned by Podman's network. Recreate the container and it will likely be different. Managing two separate units that must always find each other is exactly the kind of friction pods exist to remove.
+The page is served — the frontend is up — but it cannot reach its own data store. Both containers are running on the same machine, yet the frontend's `localhost` is its own container, and the store is not there. Running the two containers in the usual fashion gives you two healthy containers that cannot talk to each other.
+
+The frontend's own logs say the same:
+
+[source,bash,role=execute]
+----
+podman logs web
+----
+
+[source,text]
+----
+[store unreachable] dial tcp 127.0.0.1:6379: connect: connection refused
+----
+
+There is no shell to enter in these images — what the application writes to its logs is the debugging surface. The logs confirm what the page showed: the store is not at the frontend's `localhost`, because in the usual fashion, every container is its own localhost.
 
 == Create a Pod
 
@@ -90,18 +116,18 @@ Notice the `# OF CONTAINERS` column: the pod already contains one container that
 
 == Run the Pieces Inside the Pod
 
-Adding a container to a pod takes a single flag. The two standalone containers are no longer needed — because they were started with `--rm`, stopping them removes them:
+The standalone containers are no longer needed — because they were started with `--rm`, stopping them removes them:
 
 [source,bash,role=execute]
 ----
 podman stop web store
 ----
 
-Now run both pieces inside the pod:
+Now run both pieces inside the pod. Adding a container to a pod takes a single flag:
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --rm --name web registry.access.redhat.com/hi/httpd:latest
+podman run --pod webapp -d --rm --name web webcounter-app:latest
 ----
 
 [source,bash,role=execute]
@@ -116,10 +142,10 @@ podman ps
 
 [source,text]
 ----
-CONTAINER ID  IMAGE                                   COMMAND               CREATED         STATUS         PORTS       NAMES
-e4f5a6b7c8d9  registry.access.redhat.com/hi/httpd     httpd -DFOREGROUND    8 seconds ago   Up 8 seconds   8080/tcp    web
-2c3d4e5f6a7b  registry.access.redhat.com/hi/valkey    valkey-server         6 seconds ago   Up 6 seconds   6379/tcp    store
-c1d2e3f4a5b6  localhost/podman-pause                  ...                   2 minutes ago   Up 2 minutes               7f6e5d4c3b2a-infra
+CONTAINER ID  IMAGE                                   COMMAND          CREATED         STATUS         PORTS       NAMES
+e4f5a6b7c8d9  webcounter-app                          gunicorn app.a   8 seconds ago   Up 8 seconds               web
+2c3d4e5f6a7b  registry.access.redhat.com/hi/valkey    valkey-server    6 seconds ago   Up 6 seconds   6379/tcp    store
+c1d2e3f4a5b6  localhost/podman-pause                  ...              2 minutes ago   Up 2 minutes               7f6e5d4c3b2a-infra
 ----
 
 == The Infra Container
@@ -157,8 +183,25 @@ podman pod inspect webapp --format '{{.State}} {{.NumContainers}}'
 Running 3
 ----
 
-Running, with three containers: the two services and the infra container. One line — the state of the whole application, pod included. You will use `podman pod inspect` again when the pod joins a network in the next module.
+Running, with three containers: the two pieces and the infra container. One line — the state of the whole application.
 
-Your application is now one unit: two services grouped into a pod, sharing a network view, started and stopped together.
+== The Pieces Talk
 
-In the next module you will connect the two pieces to each other and make the web frontend reachable from outside.
+Inside a pod, all containers share one localhost — and the store listens on 6379. The frontend's startup log shows it found the store:
+
+[source,bash,role=execute]
+----
+podman pod logs webapp
+----
+
+[source,text]
+----
+---2c3d4e5f6a7b---
+1:M 19 Oct 2026 * Ready to accept connections tcp
+---e4f5a6b7c8d9---
+store reached at localhost:6379
+----
+
+One command returned the logs of every container in the pod — the store's startup line and the frontend's. `store reached at localhost:6379`: no addresses, no published ports, just the shared localhost the infra container provides. The pod is what let the pieces talk.
+
+But logs are the only window into this pod. From the host, the page is still unreachable — the pod has published nothing, and nothing gets in unless you open it. That is the next module.

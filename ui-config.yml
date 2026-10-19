@@ -11,7 +11,7 @@ antora:
       label: "Letting the Right Traffic In"
       solveButton: false
     - name: module-03
-      label: "A Dependent Service Outside the Pod"
+      label: "How Podman Networks Operate"
       solveButton: false
 
 tabs:
