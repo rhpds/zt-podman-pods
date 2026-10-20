@@ -74,6 +74,12 @@ podman logs web
 
 [source,text]
 ----
+[2026-10-20 13:29:02 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-10-20 13:29:02 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-10-20 13:29:02 +0000] [1] [INFO] Using worker: sync
+[2026-10-20 13:29:02 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-10-20 13:29:02 +0000] [3] [INFO] Booting worker with pid: 3
+[store unreachable] Error -2 connecting to store:6379. Name or service not known.
 [store unreachable] Error -2 connecting to store:6379. Name or service not known.
 ----
 
@@ -81,11 +87,11 @@ The name `store` does not resolve. The frontend is on the network, but nothing b
 
 == Start the Store
 
-Run the store the usual way — the default network, joined automatically:
+Run the store the usual way — the default network, joined automatically. One flag: valkey's protected mode only accepts connections from its own loopback, and the frontend connects over the network:
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest --protected-mode no
 ----
 
 The store is running, but on the default network, so the name `store` still does not resolve on `app-net`. Join the running container to the new network — the other way a container joins: at start the frontend took `--network`; a running container takes `podman network connect`, no recreation:
