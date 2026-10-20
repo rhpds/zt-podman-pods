@@ -31,7 +31,11 @@ Starting it is one command too:
 podman pod start webapp
 ----
 
-The published port comes back with the pod. Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders again, and the count kept going — `3`, one more than module-02 left it. The store is the same container it was before the stop — stopped is not removed — and its data came back with it. What actually resets the count is replacing the store, which is the next lesson.
+The published port comes back with the pod. Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders again, and the count kept going — `3`, one more than module-02 left it.
+
+image::webcounter-pod-start.png[]
+
+The store is the same container it was before the stop — stopped is not removed — and its data came back with it. What actually resets the count is replacing the store, which is the next lesson.
 
 == Logs: One Command, Every Container
 
@@ -146,7 +150,11 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 
 The pod never stopped: the new store container joined the pod's shared localhost, and the frontend found it the way it found the old one.
 
-Reload the page in your browser: the count went back to `1` — the store's state lived in the container that was replaced. The pod kept running; only the piece changed.
+Reload the page in your browser: the count went back to `1`.
+
+image::webcounter-replace.png[]
+
+The store's state lived in the container that was replaced. The pod kept running; only the piece changed.
 
 == Take the Application Down
 
