@@ -31,7 +31,7 @@ Starting it is one command too:
 podman pod start webapp
 ----
 
-The published port comes back with the pod. Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders again, and the count kept going — `3`, one more than module-02 left it.
+The published port comes back with the pod. Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders again, and the count kept going from where module-02 left it — it did not start over.
 
 image::webcounter-pod-start.png[]
 
