@@ -42,7 +42,11 @@ podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:lat
 
 No environment variable, no network join — and no `--protected-mode no` this time. Inside the pod the pieces share one network namespace: the frontend's connection arrives on the store's own loopback, and valkey accepts loopback connections even in protected mode. The store listens on 6379, and `localhost` is the coordinated hostname — the pieces agree on it because they share the pod's network view.
 
-The pod is one application, and it is already talking. Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`, served from the store at `localhost:6379`. No connection was configured — no environment variable pointed the frontend at the store, no network was created, no ports opened between the pieces. They share one localhost, and that is the whole configuration.
+The pod is one application, and it is already talking. Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`, served from the store at `localhost:6379`.
+
+image::webcounter-pod.png[]
+
+No connection was configured — no environment variable pointed the frontend at the store, no network was created, no ports opened between the pieces. They share one localhost, and that is the whole configuration.
 
 == The Infra Container
 
