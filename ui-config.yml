@@ -8,12 +8,9 @@ antora:
       label: "Two Containers, One Application"
       solveButton: false
     - name: module-02
-      label: "Exploring Container Networking"
-      solveButton: false
-    - name: module-03
       label: "Grouping Containers into Pods"
       solveButton: false
-    - name: module-04
+    - name: module-03
       label: "Managing the Pod"
       solveButton: false
 
