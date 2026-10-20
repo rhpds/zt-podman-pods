@@ -26,11 +26,11 @@ echo "Packages installed" >> /tmp/progress.log
 # This lab pulls public images only — no private registry, no secrets beyond registration.
 # -------------------------
 
-# Pre-pull the lab images into the rhel user's storage
-pull_public_images rhel \
+# Pre-pull the lab images into root's storage (the lab session runs as root)
+pull_public_images root \
     ghcr.io/rhel-labs/webcounter-app:latest \
     registry.access.redhat.com/hi/valkey:latest
-echo "Lab images staged in rhel user storage" >> /tmp/progress.log
+echo "Lab images staged in root storage" >> /tmp/progress.log
 
 cleanup_subscription
 cleanup_tmpfiles
