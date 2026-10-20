@@ -2,7 +2,7 @@
 
 Your web service is two pieces. There is a web frontend that serves pages, and a data store that holds its state. For lifecycle management the pieces run as two containers: they are built, updated, and fail together — and to work at all, they need to communicate.
 
-In this module you will run the two containers the usual way, find out that two containers on one machine still cannot talk to each other, and explore container networking until they can.
+In this module you will run the two containers and connect them: the pieces need to talk, and the simplest way is a Podman network.
 
 The images this lab uses are minimal: no shell, no package manager, running as non-root users on unprivileged ports. You configure them with environment variables, and you work with them from the outside — there is no logging into these containers.
 
@@ -52,47 +52,9 @@ b1e2f3a4c5d6  webcounter-app                          gunicorn app.a   5 seconds
 
 Two containers, both healthy, both running on this one machine.
 
-== The Pieces Cannot Talk
+== Network the Pieces
 
-From the host, load the page:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8000
-----
-
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>WebCounter</title></head>
-<body>
-<h1>WebCounter</h1>
-<p>Page views: —</p>
-<p>The web frontend cannot reach its data store at localhost:6379.</p>
-</body>
-</html>
-----
-
-The page is served — the frontend is up — but it cannot reach its own data store. Both containers are running on the same machine, yet the frontend's `localhost` is its own container, and the store is not there.
-
-The frontend's own logs say the same:
-
-[source,bash,role=execute]
-----
-podman logs web
-----
-
-[source,text]
-----
-[store unreachable] dial tcp 127.0.0.1:6379: connect: connection refused
-----
-
-There is no shell to enter in these images — what the application writes to its logs is the debugging surface. The logs confirm what the page showed: in the usual fashion, every container is its own localhost.
-
-== Explore Networking
-
-The frontend needs the store's location. The store has an address, but that address is assigned by Podman's network and changes every time the container is recreated — wiring a changing address into a static configuration is not coordination. What the frontend needs is a name that resolves, on a network both containers join.
+The pieces need to talk: the frontend reads its state from the store on every page load. But each container has its own localhost — from inside the frontend container, `localhost` is the frontend, not the store — and the store's assigned address changes every time the container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network.
 
 [source,bash,role=execute]
 ----
@@ -115,7 +77,7 @@ podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store
 
 One new piece of configuration: `STORE_HOST=store` — the store's container name, instead of the frontend's own localhost. The store keeps running, on the default network; it has not joined the new one yet.
 
-Check the frontend's logs:
+There is no shell to enter in these images — what the application writes to its logs is the debugging surface. Check it:
 
 [source,bash,role=execute]
 ----
