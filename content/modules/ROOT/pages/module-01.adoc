@@ -24,7 +24,7 @@ Podman 5 is the current major version on RHEL 10.
 
 == Create a Network
 
-The frontend needs to talk to the store: it reads its state from the store on every page load. What it expects is a store reachable at `STORE_HOST:6379` — a name that resolves. What it has, so far, is Podman's default network:
+The frontend needs to talk to the store: it reads its state from the store on every page load. The store's location is the `STORE_HOST` environment variable — and when `STORE_HOST` is not defined, it is `localhost`, the frontend's own container. What it has, so far, is Podman's default network:
 
 ----
 +------------------------------------------------------------------+
@@ -34,16 +34,16 @@ The frontend needs to talk to the store: it reads its state from the store on ev
 |   |  web                          |  |  store              |     |
 |   |  gunicorn :8000               |  |  valkey :6379       |     |
 |   |                               |  |                     |     |
-|   |  reads its state from the     |  |  listening on 6379  |     |
-|   |  store at STORE_HOST:6379     |  |                     |     |
+|   |  reads its state from the     |  |  listening on       |     |
+|   |  store at STORE_HOST:6379     |  |  its own localhost  |     |
+|   |                               |  |                     |     |
+|   |  STORE_HOST defaults to       |  |                     |     |
+|   |  localhost:6379               |  |                     |     |
 |   +-------------------------------+  +---------------------+     |
-|                                                                  |
-|      the name "store" does not resolve -- every container's      |
-|      localhost is its own                                        |
 +------------------------------------------------------------------+
 ----
 
-Nothing resolves the name `store`, and the store's assigned address changes every time its container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network:
+So the frontend's default target — its own localhost:6379 — is where no store is: from inside the web container, `localhost` is the web, not the store. And the store's assigned address changes every time its container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network:
 
 [source,bash,role=execute]
 ----
