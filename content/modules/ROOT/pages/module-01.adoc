@@ -101,16 +101,11 @@ podman network create app-net
 
 So far every container has used Podman's default network, joined automatically. A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
 
-Join both pieces to it — stopping them removes them, because they were started with `--rm`:
+The frontend's store address is an environment variable, read when the container starts — so the frontend is the one piece that needs recreating. Stopping it removes it, because it was started with `--rm`:
 
 [source,bash,role=execute]
 ----
-podman stop web store
-----
-
-[source,bash,role=execute]
-----
-podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest
+podman stop web
 ----
 
 [source,bash,role=execute]
@@ -118,7 +113,28 @@ podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/
 podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
 ----
 
-One new piece of configuration: `STORE_HOST=store` — the store's container name, instead of the frontend's own localhost.
+One new piece of configuration: `STORE_HOST=store` — the store's container name, instead of the frontend's own localhost. The store keeps running, on the default network; it has not joined the new one yet.
+
+Check the frontend's logs:
+
+[source,bash,role=execute]
+----
+podman logs web
+----
+
+[source,text]
+----
+[store unreachable] Error -2 connecting to store:6379. Name or service not known.
+----
+
+The name `store` does not resolve. The frontend is on the new network, but the store is not on it — DNS on a user-defined network resolves container names, and only for containers on that network.
+
+Move the running store onto it. No recreation: the store joins the network as it is:
+
+[source,bash,role=execute]
+----
+podman network connect app-net store
+----
 
 == Networking Works
 
@@ -160,7 +176,7 @@ curl http://localhost:8000
 </html>
 ----
 
-The frontend reached the store at `store:6379` — the container's name, resolved through the network's DNS. Two containers on a shared network, finding each other by name, talking on every page load.
+The moment the store joined the network, the name resolved and the page worked — same command as the failed startup ping, different result now. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
 
 == Two Containers Are Still Two Containers
 
