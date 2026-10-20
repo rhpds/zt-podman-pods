@@ -24,14 +24,33 @@ Podman 5 is the current major version on RHEL 10.
 
 == Create a Network
 
-The frontend needs to talk to the store: it reads its state from the store on every page load. But each container has its own localhost — from inside the frontend container, `localhost` is the frontend, not the store — and the store's assigned address changes every time the container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network.
+The frontend needs to talk to the store: it reads its state from the store on every page load. What it expects is a store reachable at `STORE_HOST:6379` — a name that resolves. What it has, so far, is Podman's default network:
+
+----
++------------------------------------------------------------------+
+|                              host                                |
+|                                                                  |
+|   +-------------------------------+  +---------------------+     |
+|   |  web                          |  |  store              |     |
+|   |  gunicorn :8000               |  |  valkey :6379       |     |
+|   |                               |  |                     |     |
+|   |  reads its state from the     |  |  listening on 6379  |     |
+|   |  store at STORE_HOST:6379     |  |                     |     |
+|   +-------------------------------+  +---------------------+     |
+|                                                                  |
+|      the name "store" does not resolve -- every container's      |
+|      localhost is its own                                        |
++------------------------------------------------------------------+
+----
+
+Nothing resolves the name `store`, and the store's assigned address changes every time its container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network:
 
 [source,bash,role=execute]
 ----
 podman network create app-net
 ----
 
-So far every container has used Podman's default network, joined automatically. A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
+A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
 
 == Run the Frontend
 
