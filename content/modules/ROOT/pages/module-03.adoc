@@ -110,6 +110,21 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 
 The pod never stopped — the frontend restarted inside it, and the other pieces were never touched. The restart is one command: no container removal, no re-running the original command, the piece comes back inside the same pod.
 
+For how much the application is using, the pod answers in one command:
+
+[source,bash,role=execute]
+----
+podman pod stats webapp
+----
+
+[source,text]
+----
+POD         POD ID        CPU %    MEM USAGE/LIMIT   MEM %    NET IO             BLOCK IO   PIDS
+webapp      7f6e5d4c3b2a  0.14%    48.3MB / 8.2GB    0.59%    3.45kB / 5.12kB    0B / 0B    5
+----
+
+The resource usage of the whole application — CPU, memory, network I/O, every container in it — in one row. One pod, one view.
+
 == Replace a Piece
 
 Restarting keeps the same container. Replacing it is different: a stopped container is not a removed container — stopping the store leaves it behind, Exited, still holding its name. Removing it frees the name, and a fresh container takes its place:
