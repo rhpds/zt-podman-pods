@@ -2,7 +2,7 @@
 
 Your web service is two pieces. There is a web frontend that serves pages, and a data store that holds its state. For lifecycle management the pieces run as two containers: they are built, updated, and fail together — and to work at all, they need to communicate.
 
-In this module you will run the two containers and connect them: the pieces need to talk, and the simplest way is a Podman network.
+In this module you will connect the pieces: a Podman network gives them somewhere to find each other, and their container names give them a way.
 
 The images this lab uses are minimal: no shell, no package manager, running as non-root users on unprivileged ports. You configure them with environment variables, and you work with them from the outside — there is no logging into these containers.
 
@@ -22,39 +22,9 @@ podman version 5.x.x
 
 Podman 5 is the current major version on RHEL 10.
 
-== Run the Pieces
+== Create a Network
 
-Run the web frontend and the data store in the usual fashion — as two independent containers. The `--rm` flag removes a container automatically when it stops, so these throwaway containers never need to be cleaned up by hand.
-
-[source,bash,role=execute]
-----
-podman run -d --rm --name web -p 8000:8000 webcounter-app:latest
-----
-
-[source,bash,role=execute]
-----
-podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
-----
-
-Check what is running:
-
-[source,bash,role=execute]
-----
-podman ps
-----
-
-[source,text]
-----
-CONTAINER ID  IMAGE                                   COMMAND          CREATED         STATUS         PORTS                     NAMES
-b1e2f3a4c5d6  webcounter-app                          gunicorn app.a   5 seconds ago   Up 5 seconds   0.0.0.0:8000->8000/tcp    web
-9a8b7c6d5e4f  registry.access.redhat.com/hi/valkey    valkey-server    3 seconds ago   Up 3 seconds   6379/tcp                  store
-----
-
-Two containers, both healthy, both running on this one machine.
-
-== Network the Pieces
-
-The pieces need to talk: the frontend reads its state from the store on every page load. But each container has its own localhost — from inside the frontend container, `localhost` is the frontend, not the store — and the store's assigned address changes every time the container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network.
+The frontend needs to talk to the store: it reads its state from the store on every page load. But each container has its own localhost — from inside the frontend container, `localhost` is the frontend, not the store — and the store's assigned address changes every time the container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network.
 
 [source,bash,role=execute]
 ----
@@ -63,19 +33,18 @@ podman network create app-net
 
 So far every container has used Podman's default network, joined automatically. A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
 
-The frontend's store address is an environment variable, read when the container starts — so the frontend is the one piece that needs recreating. Stopping it removes it, because it was started with `--rm`:
+== Run the Frontend
 
-[source,bash,role=execute]
-----
-podman stop web
-----
+Run the frontend on the new network. The `--rm` flag removes a container automatically when it stops, so these containers never need to be cleaned up by hand. The store location is an environment variable, read when the container starts:
 
 [source,bash,role=execute]
 ----
 podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
 ----
 
-One new piece of configuration: `STORE_HOST=store` — the store's container name, instead of the frontend's own localhost. The store keeps running, on the default network; it has not joined the new one yet.
+One piece of configuration: `STORE_HOST=store` — the store's container name. The frontend is now set to find its store by name on this network, and no container by that name is on it yet.
+
+== Check the Log
 
 There is no shell to enter in these images — what the application writes to its logs is the debugging surface. Check it:
 
@@ -89,9 +58,18 @@ podman logs web
 [store unreachable] Error -2 connecting to store:6379. Name or service not known.
 ----
 
-The name `store` does not resolve. The frontend is on the new network, but the store is not on it — DNS on a user-defined network resolves container names, and only for containers on that network.
+The name `store` does not resolve. The frontend is on the network, but nothing by that name is — DNS on a user-defined network resolves container names, and only for containers on that network.
 
-Move the running store onto it. No recreation: the store joins the network as it is:
+== Start the Store
+
+Run the store the usual way — the default network, joined automatically:
+
+[source,bash,role=execute]
+----
+podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+----
+
+The store is running, but on the default network, so the name `store` still does not resolve on `app-net`. Join the running container to the new network — the other way a container joins: at start the frontend took `--network`; a running container takes `podman network connect`, no recreation:
 
 [source,bash,role=execute]
 ----
@@ -138,7 +116,7 @@ curl http://localhost:8000
 </html>
 ----
 
-The moment the store joined the network, the name resolved and the page worked — same command as the failed startup ping, different result now. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
+The moment the store joined the network, the name resolved and the page worked — the startup log's unresolvable name now answers on every page load. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
 
 == Two Containers Are Still Two Containers
 
