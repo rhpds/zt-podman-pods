@@ -87,18 +87,11 @@ The name `store` does not resolve. The frontend is on the network, but nothing b
 
 == Start the Store
 
-Run the store the usual way — the default network, joined automatically. One flag: valkey's protected mode only accepts connections from its own loopback, and the frontend connects over the network:
+The store has to know about the network too. A container learns its networks when it starts, so the store joins `app-net` the same way the frontend did — and it needs one flag. Valkey's protected mode only accepts connections from its own loopback; the frontend connects over the network, which is a remote connection as far as the store is concerned — so protected mode is turned off:
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest --protected-mode no
-----
-
-The store is running, but on the default network, so the name `store` still does not resolve on `app-net`. Join the running container to the new network — the other way a container joins: at start the frontend took `--network`; a running container takes `podman network connect`, no recreation:
-
-[source,bash,role=execute]
-----
-podman network connect app-net store
+podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest --protected-mode no
 ----
 
 == Networking Works
