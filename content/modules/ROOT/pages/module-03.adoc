@@ -48,13 +48,54 @@ podman pod logs webapp
 
 [source,text]
 ----
-00335c55bc34 [2026-10-20 14:05:58 +0000] [1] [INFO] Starting gunicorn 23.0.0
-00335c55bc34 store reached at localhost:6379
-066f5d153c67 1:M 20 Oct 2026 14:05:58.904 * Valkey version=9.0.6, bits=64, commit=00000000, modified=0, pid=1, just started
-066f5d153c67 1:M 20 Oct 2026 14:05:58.909 * Ready to accept connections tcp
+ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Starting gunicorn 23.0.0
+ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Using worker: sync
+ef078db4d6c5 [2026-10-20 19:45:13 +0000] [2] [INFO] Booting worker with pid: 2
+ef078db4d6c5 [2026-10-20 19:45:13 +0000] [3] [INFO] Booting worker with pid: 3
+ef078db4d6c5 [store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+ef078db4d6c5 [store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+ef078db4d6c5 [2026-10-20 19:47:42 +0000] [1] [INFO] Handling signal: term
+ef078db4d6c5 [2026-10-20 19:47:42 +0000] [3] [INFO] Worker exiting (pid: 3)
+ef078db4d6c5 [2026-10-20 19:47:42 +0000] [2] [INFO] Worker exiting (pid: 2)
+ef078db4d6c5 [2026-10-20 19:47:42 +0000] [1] [INFO] Shutting down: Master
+ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Starting gunicorn 23.0.0
+ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Using worker: sync
+ef078db4d6c5 [2026-10-20 19:47:48 +0000] [2] [INFO] Booting worker with pid: 2
+ef078db4d6c5 store reached at localhost:6379
+ef078db4d6c5 [2026-10-20 19:47:48 +0000] [3] [INFO] Booting worker with pid: 3
+ef078db4d6c5 store reached at localhost:6379
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.775 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * Valkey version=9.0.6, bits=64, commit=00000000, modified=0, pid=1, just started
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * monotonic clock: POSIX clock_gettime
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Running mode=standalone, port=6379.
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Server initialized
+3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Ready to accept connections tcp
+3e40325e2a90 1:signal-handler (1792525662) Received SIGTERM scheduling shutdown...
+3e40325e2a90 1:M 20 Oct 2026 19:47:42.559 * User requested shutdown...
+3e40325e2a90 1:M 20 Oct 2026 19:47:42.560 * Saving the final RDB snapshot before exiting.
+3e40325e2a90 1:M 20 Oct 2026 19:47:42.567 * DB saved on disk
+3e40325e2a90 1:M 20 Oct 2026 19:47:42.567 # Valkey is now ready to exit, bye bye...
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.029 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 * Valkey version=9.0.6, bits=64, commit=00000000, modified=0, pid=1, just started
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.032 * monotonic clock: POSIX clock_gettime
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.033 * Running mode=standalone, port=6379.
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.034 * Server initialized
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Cleaning slot migration log in anticipation of a load operation.
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Loading RDB produced by Valkey version 9.0.6
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * RDB age 6 seconds
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * RDB memory usage when created 0.88 Mb
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Done loading RDB, keys loaded: 1, keys expired: 0.
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * DB loaded from disk: 0.001 seconds
+3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Ready to accept connections tcp
 ----
 
-One command, every container's logs — each line prefixed with the ID of the container it came from: the frontend's gunicorn startup and the store's valkey startup, interleaved as they happened. When something in the application misbehaves, you look at the pod, not at its pieces one at a time.
+One command, every container's logs — each line prefixed with the ID of the container it came from: the frontend's full history, then the store's. Everything the module has done so far is in there: the startup pings that fired before the store was listening, the graceful SIGTERM shutdown on both sides, and the store saving its final RDB snapshot before it exited — then loading it back on start, the data coming back with the container. When something in the application misbehaves, you look at the pod, not at its pieces one at a time.
 
 == What Is Running Inside
 
