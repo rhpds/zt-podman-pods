@@ -5,13 +5,16 @@ antora:
   dir: www
   modules:
     - name: module-01
-      label: "Grouping Containers into Pods"
+      label: "Two Containers, One Application"
       solveButton: false
     - name: module-02
-      label: "Letting the Right Traffic In"
+      label: "Exploring Container Networking"
       solveButton: false
     - name: module-03
-      label: "How Podman Networks Operate"
+      label: "Grouping Containers into Pods"
+      solveButton: false
+    - name: module-04
+      label: "Managing the Pod"
       solveButton: false
 
 tabs:

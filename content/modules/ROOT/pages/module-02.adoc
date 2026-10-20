@@ -1,56 +1,56 @@
-= Letting the Right Traffic In
+= Exploring Container Networking
 
-Your application is one pod, and the pieces talk: the startup log showed the frontend reach the store over the shared localhost. But from outside, nothing gets in — the pod has published no ports. In this module you will open the pod to its users, and see how little needs to open.
+The application is two healthy containers on one machine that cannot talk: each container is its own localhost. In this module you will explore container networking until the pieces can find each other.
 
-Access is deliberate. These images expose nothing by default. Everything that gets in gets in because you opened it.
+== The Address Is Not the Answer
 
-== The Pod Publishes Nothing
-
-From the host, try the page:
+The frontend needs the store's location. The store has one:
 
 [source,bash,role=execute]
 ----
-curl http://localhost:8000
+podman inspect store --format '{{.NetworkSettings.IPAddress}}'
 ----
 
 [source,text]
 ----
-curl: (7) Failed to connect to localhost port 8000 after 0 ms: Couldn't connect to server
+10.88.0.4
 ----
 
-The `web` container is listening on 8000 — but the connection is refused. The frontend is inside the pod, and the pod has not published any ports to the host. This is the isolation doing its job: a pod shares one network view internally and exposes nothing externally unless you tell it to.
+That address is assigned by Podman's network — recreate the container and it will likely be different. Wiring a changing address into a static configuration is not coordination. What the frontend needs is a name that resolves, on a network both containers join.
 
-== Publish a Port at the Pod Level
-
-Recreate the pod with a published port. First stop and remove the current pod — this removes every container in it, which is the point of a pod:
+== Create a Network
 
 [source,bash,role=execute]
 ----
-podman pod stop webapp && podman pod rm webapp
+podman network create app-net
 ----
 
-Create the pod again, this time publishing port 8000 on the host to port 8000 in the pod:
+So far every container has used Podman's default network, joined automatically. A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
+
+== Join the Pieces by Name
+
+Join both pieces to it — stopping them removes them, because they were started with `--rm`:
 
 [source,bash,role=execute]
 ----
-podman pod create --name webapp -p 8000:8000
-----
-
-Note where the flag went: on the pod, not on any container. Port publishing is a property of the pod's network namespace — the infra container holds it, and every container in the pod shares it.
-
-== Run the Application
-
-[source,bash,role=execute]
-----
-podman run --pod webapp -d --rm --name web webcounter-app:latest
+podman stop web store
 ----
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest
 ----
 
-From the host, the page is now served:
+[source,bash,role=execute]
+----
+podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
+----
+
+One new piece of configuration: `STORE_HOST=store` — the store's container name, instead of the frontend's own localhost.
+
+== Networking Works
+
+From the host, the page:
 
 [source,bash,role=execute]
 ----
@@ -64,7 +64,7 @@ curl http://localhost:8000
 <head><title>WebCounter</title></head>
 <body>
 <h1>WebCounter</h1>
-<p>Page views: 1, served from store at localhost:6379</p>
+<p>Page views: 1, served from store at store:6379</p>
 </body>
 </html>
 ----
@@ -83,27 +83,15 @@ curl http://localhost:8000
 <head><title>WebCounter</title></head>
 <body>
 <h1>WebCounter</h1>
-<p>Page views: 2, served from store at localhost:6379</p>
+<p>Page views: 2, served from store at store:6379</p>
 </body>
 </html>
 ----
 
-Every page load is the frontend querying the store and incrementing the count: two containers in one pod, talking over the shared localhost, with the number to prove it. The store has no published port and no address you ever needed — the pieces talk privately, and the page is the evidence.
+The frontend reached the store at `store:6379` — the container's name, resolved through the network's DNS. Two containers on a shared network, finding each other by name, talking on every page load.
 
-== Only the Right Port Opens
+== Two Containers Are Still Two Containers
 
-The store lives in the same pod as a reachable service. Try it from the host anyway:
+Networking solved communication. Look at what you are managing, though: two separate start commands, two lifecycles to stop and start, a store name wired into an environment variable, the frontend's port published container by container. As an application, the pieces are not coordinated — they are two containers that happen to be on the same network.
 
-[source,bash,role=execute]
-----
-curl http://localhost:6379
-----
-
-[source,text]
-----
-curl: (7) Failed to connect to localhost port 6379 after 0 ms: Couldn't connect to server
-----
-
-Only port 8000 was published. The store stays inside: the pod exposes exactly what you told it to — one port, the one the users need — no matter how many containers it holds. The same isolation you relaxed for the frontend, deliberately, at the pod level, is still keeping the store private.
-
-Your users can now reach the web frontend, and the two pieces talk privately behind it. A pod is one way to let two containers talk. In the next module, you will take the pod apart and let them talk by name instead.
+An application is one thing: one lifecycle, one network view, hostnames the pieces agree on. That is what the next module adds.

@@ -1,33 +1,105 @@
-= How Podman Networks Operate
+= Grouping Containers into Pods
 
-Your application ran as a pod: the pieces talked over the shared localhost, and the page was reachable on one published port. A pod is one way to let two containers talk. A network is the other. In this module you will run the same application without a pod, join the containers to a user-defined network, and watch the frontend find the store by name.
+The application communicates: two containers on a shared network, finding each other by name on every page load. But as an application it is not coordinated — two lifecycles, a store name wired in by environment variable, a port published per container. In this module you will group the pieces into a pod, and the pod will solve the coordination.
 
-== Take the Pod Apart
-
-One command stops the infra container and every service in it:
+== Create a Pod
 
 [source,bash,role=execute]
 ----
-podman pod stop webapp && podman pod rm webapp
+podman pod create --name webapp -p 8000:8000
 ----
 
-The pieces lived and died together — that is what "one application" meant.
+A pod is a group of containers that share a single network namespace — one IP address, one localhost, one lifecycle. Note where the port went: on the pod, not on any container. Port publishing is a property of the pod's network namespace, held by the infra container and shared by every container in it.
 
-== The Usual Fashion, Again
-
-Run the two pieces in the usual fashion — independent containers, no pod:
+You now have an empty pod:
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name web -p 8000:8000 webcounter-app:latest
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Created     3 seconds ago   c1d2e3f4a5b6  1
+----
+
+Notice the `# OF CONTAINERS` column: the pod already contains one container that you did not start.
+
+== Run the Pieces Inside the Pod
+
+The networked containers are no longer needed — stopping them removes them, because they were started with `--rm`:
+
+[source,bash,role=execute]
+----
+podman stop web store
+----
+
+Run both pieces inside the pod. Adding a container to a pod takes a single flag:
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --rm --name web webcounter-app:latest
 ----
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
-From the host, the page:
+No environment variable, no network join. The frontend finds the store anyway: inside a pod, every container shares one localhost, and the store listens on 6379. `localhost` is the coordinated hostname — the pieces agree on it because they share the pod's network view.
+
+== The Infra Container
+
+There is a third container:
+
+[source,bash,role=execute]
+----
+podman ps
+----
+
+[source,text]
+----
+CONTAINER ID  IMAGE                                   COMMAND          CREATED         STATUS         PORTS       NAMES
+e4f5a6b7c8d9  webcounter-app                          gunicorn app.a   8 seconds ago   Up 8 seconds               web
+2c3d4e5f6a7b  registry.access.redhat.com/hi/valkey    valkey-server    6 seconds ago   Up 6 seconds   6379/tcp    store
+c1d2e3f4a5b6  localhost/podman-pause                  ...              2 minutes ago   Up 2 minutes               7f6e5d4c3b2a-infra
+----
+
+`7f6e5d4c3b2a-infra`, running an image called `podman-pause`, is the infra container — and it *is* the pod. It runs a tiny process whose only job is to hold open the namespaces the pod's containers share — the network namespace in particular. Because `web` and `store` join the infra container's namespaces instead of creating their own, they share one IP address and one localhost.
+
+The infra container is why pods work: it exists for as long as the pod does, and every container in the pod comes and goes inside the boundaries it holds. When the pod stops, the infra container stops, and the shared network view disappears with it.
+
+== One Application
+
+`podman pod ps` gives the summary view:
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Running     3 minutes ago   c1d2e3f4a5b6  3
+----
+
+Inspect the pod, filtered to the state of the application:
+
+[source,bash,role=execute]
+----
+podman pod inspect webapp --format '{{.State}} {{.NumContainers}}'
+----
+
+[source,text]
+----
+Running 3
+----
+
+Running, with three containers: the two pieces and the infra container. One line — the state of the whole application.
+
+From the host, the page is served:
 
 [source,bash,role=execute]
 ----
@@ -36,45 +108,17 @@ curl http://localhost:8000
 
 [source,text]
 ----
-<p>Page views: —</p>
-<p>The web frontend cannot reach its data store at localhost:6379.</p>
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: 1, served from store at localhost:6379</p>
+</body>
+</html>
 ----
 
-The same failure as the first module: without a pod, the frontend's `localhost` is its own container, and the store is not there. The frontend needs the store's address — and chasing addresses is the problem: they change every time a container is recreated. What it needs is a name that resolves, on a network both containers join.
-
-== Create a Network
-
-[source,bash,role=execute]
-----
-podman network create app-net
-----
-
-So far every container has used Podman's default network, which every container joins automatically. A user-defined network is different: containers join it by choice. Membership is what makes containers visible to each other.
-
-== Join the Pieces by Name
-
-Recreate both containers on the network. Because they were started with `--rm`, stopping them removes them:
-
-[source,bash,role=execute]
-----
-podman stop web store
-----
-
-Run the store on the network first:
-
-[source,bash,role=execute]
-----
-podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest
-----
-
-Now the frontend, on the same network, pointing at the store by its container name. One environment variable is all that changes:
-
-[source,bash,role=execute]
-----
-podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
-----
-
-From the host, the page is served — and it says where the store was found:
+Load it again:
 
 [source,bash,role=execute]
 ----
@@ -83,41 +127,32 @@ curl http://localhost:8000
 
 [source,text]
 ----
-<p>Page views: 1, served from store at store:6379</p>
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: 2, served from store at localhost:6379</p>
+</body>
+</html>
 ----
 
-The frontend reached the store at `store:6379`. `store` is not an address — it is the container's name, resolved through the network's DNS. No pod, no shared localhost: the network is what let two containers find each other, and the name is how. The only difference from the failing run is one environment variable.
+The count proves the pieces talk. Compare the two setups: on a network, the frontend needed a network join and an environment variable; in the pod, it needed a flag. The pod solved the networking by removing it — one lifecycle, one network view, one hostname the pieces agree on.
 
-== Who Is on the Network
+== Only the Right Port Opens
 
-The network is an object you can inspect. Filter its output to the members:
+The store lives in the same pod as a reachable service. Try it from the host anyway:
 
 [source,bash,role=execute]
 ----
-podman network inspect app-net --format '{{range .containers}}{{.name}} {{end}}'
+curl http://localhost:6379
 ----
 
 [source,text]
 ----
-store web
+curl: (7) Failed to connect to localhost port 6379 after 0 ms: Couldn't connect to server
 ----
 
-Both containers, listed by name — the same names the frontend resolved. The network's members are its communication boundary: containers on it can find each other by name, and containers off it cannot.
+Only port 8000 was published — once, at the pod level, for the whole application. The pod exposes exactly what you told it to. The same isolation you relaxed for the frontend is still keeping the store private.
 
-== Clean Up
-
-The application is two containers on a network. Stopping them removes them — they were started with `--rm`:
-
-[source,bash,role=execute]
-----
-podman stop web store
-----
-
-The network stays behind until you remove it:
-
-[source,bash,role=execute]
-----
-podman network rm app-net
-----
-
-Two ways to let containers talk, one application: a pod gives its containers one localhost and one lifecycle; a network gives containers names and a boundary you join by choice. The same application ran both ways — the only difference was one environment variable.
+The application is one pod. The next module: managing it.
