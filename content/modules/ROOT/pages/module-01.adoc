@@ -96,48 +96,34 @@ podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/
 
 == Networking Works
 
-From the host, the page:
+Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
 
-[source,bash,role=execute]
-----
-curl http://localhost:8000
-----
+image::webcounter.png[]
+[WARNING]
+====
+If you are using a Chromium based browser, recent changes to the default HSTS policy may rewrite the application URL to HTTPS from HTTP and you will get an error page.
+Edit the URL in the address bar to `http://` and reload the page. This should tell the browser to keep this URL as HTTP for the rest of the lab.
+====
 
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>WebCounter</title></head>
-<body>
-<h1>WebCounter</h1>
-<p>Page views: 1, served from store at store:6379</p>
-</body>
-</html>
-----
-
-Load it again:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8000
-----
-
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>WebCounter</title></head>
-<body>
-<h1>WebCounter</h1>
-<p>Page views: 2, served from store at store:6379</p>
-</body>
-</html>
-----
-
-The moment the store joined the network, the name resolved and the page worked — the startup log's unresolvable name now answers on every page load. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
+The page renders: *WebCounter*, and a count of page views — `1`, served from the store at `store:6379`. Reload and the count increments: the startup log's unresolvable name now answers on every page load. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
 
 == Two Containers Are Still Two Containers
 
 Networking solved communication. Look at what you are managing, though: two separate start commands, two lifecycles to stop and start, a store name wired into an environment variable, the frontend's port published container by container. As an application, the pieces are not coordinated — they are two containers that happen to be on the same network.
+
+Two lifecycles means two stop commands, in the right order — and because these containers were throwaways, stopping removes them:
+
+[source,bash,role=execute]
+----
+podman stop web store
+----
+
+[source,text]
+----
+web
+store
+----
+
+Both containers are gone, and nothing needs cleaning up by hand. But the application they made up is gone with them: two containers that happen to be on the same network have no existence apart from the processes running them.
 
 An application is one thing: one lifecycle, one network view, hostnames the pieces agree on. That is what the next module adds.

@@ -28,13 +28,6 @@ Notice the `# OF CONTAINERS` column: the pod already contains one container that
 
 == Run the Pieces Inside the Pod
 
-The networked containers are no longer needed — stopping them removes them, because they were started with `--rm`:
-
-[source,bash,role=execute]
-----
-podman stop web store
-----
-
 Run both pieces inside the pod — and note what is missing: no `--rm` this time. In module-01 the containers were throwaway, removed the moment they stopped. These pieces are the application, and the application is something you will stop and start again — its pieces have to still be there. Adding a container to a pod takes a single flag:
 
 [source,bash,role=execute]
@@ -48,6 +41,8 @@ podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:lat
 ----
 
 No environment variable, no network join — and no `--protected-mode no` this time. Inside the pod the pieces share one network namespace: the frontend's connection arrives on the store's own loopback, and valkey accepts loopback connections even in protected mode. The store listens on 6379, and `localhost` is the coordinated hostname — the pieces agree on it because they share the pod's network view.
+
+The pod is one application, and it is already talking. Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`, served from the store at `localhost:6379`. No connection was configured — no environment variable pointed the frontend at the store, no network was created, no ports opened between the pieces. They share one localhost, and that is the whole configuration.
 
 == The Infra Container
 
@@ -99,46 +94,6 @@ Running 3
 
 Running, with three containers: the two pieces and the infra container. One line — the state of the whole application.
 
-From the host, the page is served:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8000
-----
-
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>WebCounter</title></head>
-<body>
-<h1>WebCounter</h1>
-<p>Page views: 1, served from store at localhost:6379</p>
-</body>
-</html>
-----
-
-Load it again:
-
-[source,bash,role=execute]
-----
-curl http://localhost:8000
-----
-
-[source,text]
-----
-<!DOCTYPE html>
-<html>
-<head><title>WebCounter</title></head>
-<body>
-<h1>WebCounter</h1>
-<p>Page views: 2, served from store at localhost:6379</p>
-</body>
-</html>
-----
-
-The count proves the pieces talk. Compare the two setups: on a network, the frontend needed a network join and an environment variable; in the pod, it needed a flag. The pod solved the networking by removing it — one lifecycle, one network view, one hostname the pieces agree on.
-
 == Only the Right Port Opens
 
 The store lives in the same pod as a reachable service. Try it from the host anyway:
@@ -154,5 +109,9 @@ curl: (7) Failed to connect to localhost port 6379 after 0 ms: Couldn't connect 
 ----
 
 Only port 8000 was published — once, at the pod level, for the whole application. The pod exposes exactly what you told it to. The same isolation you relaxed for the frontend is still keeping the store private.
+
+Reload the page in the browser: the count increments. There is no other path into the store — the only connection between the pieces is the one they were born with, the pod's own localhost.
+
+The count proves the pieces talk. Compare the two setups: on a network, the frontend needed a network join and an environment variable; in the pod, it needed a flag. The pod solved the networking by removing it — one lifecycle, one network view, one hostname the pieces agree on.
 
 The application is one pod. The next module: managing it.
