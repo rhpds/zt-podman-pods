@@ -1,6 +1,54 @@
 = Managing the Pod
 
-The application is one pod: two pieces talking over shared localhost, the page reachable on one published port, one lifecycle. In this module you will manage it — read its logs, see what is running inside it, restart a piece, replace a piece, and take it down.
+The application is one pod: two pieces talking over shared localhost, the page reachable on one published port, one lifecycle. In this module you will manage it — stop it and start it as one thing, read everything it writes, see what is running inside it, and operate on the pieces without taking the application apart.
+
+== Stop the Application, Start It Again
+
+The application has one lifecycle. Stopping it is one command, and it stops every piece in it:
+
+[source,bash,role=execute]
+----
+podman pod stop webapp
+----
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Exited      5 minutes ago   c1d2e3f4a5b6  3
+----
+
+One command stopped the frontend, the store, and the infra container that holds them together. This is what the pod bought you: in module-01, two pieces meant two stop sequences in the right order; the application stops as one thing.
+
+Starting it is one command too:
+
+[source,bash,role=execute]
+----
+podman pod start webapp
+----
+
+[source,bash,role=execute]
+----
+curl http://localhost:8000
+----
+
+[source,text]
+----
+<!DOCTYPE html>
+<html>
+<head><title>WebCounter</title></head>
+<body>
+<h1>WebCounter</h1>
+<p>Page views: 1, served from store at localhost:6379</p>
+</body>
+</html>
+----
+
+The application is serving again — every piece came back, in one command. (The count is back to 1: the store restarted with empty memory. Nothing here lives outside a running container.)
 
 == Logs: One Command, Every Container
 
@@ -35,14 +83,14 @@ podman pod top webapp
 USER        PID         PPID        %CPU    ELAPSED         TIME      COMMAND
 65532       1           0           0.000   5m2s            0s        gunicorn app.a
 65532       12          1           0.000   5m2s            0s        gunicorn app.a
-apache      1           0           0.000   4m59s           0s        httpd -DFOREGROUND
+65532       1           0           0.000   4m59s           0s        valkey-server *:6379
 ----
 
 The processes of every container in the pod, in one table — no shell required. The frontend is gunicorn, the store is valkey's server process, and the users they run as come from the images. When a piece misbehaves, this is how you see inside it without a shell.
 
 == Restart a Piece
 
-A piece misbehaves. Restart it without touching the rest of the application:
+The pod operates as one thing — and individual pieces can still be operated on inside it. A piece misbehaves; restart it without touching the rest of the application:
 
 [source,bash,role=execute]
 ----
@@ -64,7 +112,7 @@ The pod never stopped — the frontend restarted inside it, and the other pieces
 
 == Replace a Piece
 
-Restarting keeps the same container. Replacing it is different: the store container is disposable — it was started with `--rm` — and a fresh one takes its place:
+Restarting keeps the same container. Replacing it is different: a stopped container is not a removed container — stopping the store leaves it behind, Exited, still holding its name. Removing it frees the name, and a fresh container takes its place:
 
 [source,bash,role=execute]
 ----
@@ -73,7 +121,12 @@ podman stop store
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+podman rm store
+----
+
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
 Check that the application is unaffected:
@@ -119,4 +172,4 @@ The whole application comes down the way it went up — one pod, one command:
 podman pod stop webapp && podman pod rm webapp
 ----
 
-One command stopped the infra container and every piece in it. The application is one thing, and it comes down as one thing — which is what "one application" means.
+One command stopped and removed the infra container and every piece in it. The application is one thing, and it comes down as one thing — which is what "one application" means.

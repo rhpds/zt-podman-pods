@@ -35,16 +35,16 @@ The networked containers are no longer needed — stopping them removes them, be
 podman stop web store
 ----
 
-Run both pieces inside the pod. Adding a container to a pod takes a single flag:
+Run both pieces inside the pod — and note what is missing: no `--rm` this time. In module-01 the containers were throwaway, removed the moment they stopped. These pieces are the application, and the application is something you will stop and start again — its pieces have to still be there. Adding a container to a pod takes a single flag:
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --rm --name web webcounter-app:latest
+podman run --pod webapp -d --name web webcounter-app:latest
 ----
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --rm --name store registry.access.redhat.com/hi/valkey:latest
+podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
 No environment variable, no network join. The frontend finds the store anyway: inside a pod, every container shares one localhost, and the store listens on 6379. `localhost` is the coordinated hostname — the pieces agree on it because they share the pod's network view.
