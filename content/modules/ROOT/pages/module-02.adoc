@@ -39,7 +39,7 @@ Run both pieces inside the pod — and note what is missing: no `--rm` this time
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --name web webcounter-app:latest
+podman run --pod webapp -d --name web ghcr.io/rhel-labs/webcounter-app:latest
 ----
 
 [source,bash,role=execute]

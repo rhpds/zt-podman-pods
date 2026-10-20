@@ -58,7 +58,7 @@ Run the frontend on the new network. The `--rm` flag removes a container automat
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store webcounter-app:latest
+podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store ghcr.io/rhel-labs/webcounter-app:latest
 ----
 
 One piece of configuration: `STORE_HOST=store` — the store's container name. The frontend is now set to find its store by name on this network, and no container by that name is on it yet.

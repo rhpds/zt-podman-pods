@@ -25,9 +25,8 @@ echo "Packages installed" >> /tmp/progress.log
 
 # Pre-pull the lab images into the rhel user's storage
 pull_public_images rhel \
-    registry.access.redhat.com/hi/httpd:latest \
-    registry.access.redhat.com/hi/valkey:latest \
-    registry.access.redhat.com/hi/curl:latest
+    ghcr.io/rhel-labs/webcounter-app:latest \
+    registry.access.redhat.com/hi/valkey:latest
 echo "Lab images staged in rhel user storage" >> /tmp/progress.log
 
 cleanup_subscription
