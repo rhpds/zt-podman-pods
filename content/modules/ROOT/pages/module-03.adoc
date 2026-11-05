@@ -1,10 +1,13 @@
 = Managing the Pod
 
-The application is one pod: two pieces talking over shared localhost, the page reachable on one published port, one lifecycle. In this module you will manage it — stop it and start it as one thing, read everything it writes, see what is running inside it, and operate on the pieces without taking the application apart.
+Now that we have the application in a pod, how do we manage it?
+When it was two separate containers, we had to do that individually and coordinated by hand.
+This module will look at how containers run (and stop) inside a pod and how we can still individually control them if needed.
 
 == Stop the Application, Start It Again
 
-The application has one lifecycle. Stopping it is one command, and it stops every piece in it:
+An application has one lifecycle. 
+Stopping it should be one command, and it shoudl stop every component.
 
 [source,bash,role=execute]
 ----
@@ -22,7 +25,8 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 7f6e5d4c3b2a  webapp      Exited      5 minutes ago   c1d2e3f4a5b6  3
 ----
 
-One command stopped the frontend, the store, and the infra container that holds them together. This is what the pod bought you: in module-01, two pieces meant two stop sequences in the right order; the application stops as one thing.
+Once it's been defined, the whole pod now operates as a single unit.
+We can now think about this as the `webapp` instead of the application made up of the `web` and `store` containers.
 
 Starting it is one command too:
 
@@ -31,19 +35,23 @@ Starting it is one command too:
 podman pod start webapp
 ----
 
-The published port comes back with the pod. Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders again, and the count kept going from where module-02 left it — it did not start over.
+The published port comes back with the pod. 
+Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
+The page renders again, and the count kept going from where you left it.
 
 image::webcounter-pod-start.png[]
 
-The store is the same container it was before the stop — stopped is not removed — and its data came back with it. What actually resets the count is replacing the store, which is the next lesson.
+The store is the same container it was before the stop and its data is still in the container.
+What actually resets the count is replacing the store, which is the next lesson.
 
 == Logs: One Command, Every Container
 
-There is no logging into these containers — they have no shell. What the applications write is the debugging surface, and the pod returns all of it at once:
+We saw the `web` container logs earlier when looking at the network, we can do something similar but at the pod level.
+This will give us logs for everything, not just the `web`.
 
 [source,bash,role=execute]
 ----
-podman pod logs webapp
+podman pod logs -n webapp
 ----
 
 [source,text]
@@ -95,7 +103,11 @@ ef078db4d6c5 store reached at localhost:6379
 3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Ready to accept connections tcp
 ----
 
-One command, every container's logs — each line prefixed with the ID of the container it came from: the frontend's full history, then the store's. Everything the module has done so far is in there: the startup pings that fired before the store was listening, the graceful SIGTERM shutdown on both sides, and the store saving its final RDB snapshot before it exited — then loading it back on start, the data coming back with the container. When something in the application misbehaves, you look at the pod, not at its pieces one at a time.
+Each line is prefixed with the name of the container it came from: the frontend's full history, then the store's. 
+Everything the application has done so far is in there: the startup pings that fired before the store was listening, the graceful SIGTERM shutdown on both sides, and the store saving its final RDB snapshot before it exited — then loading it back on start, the data coming back with the container. 
+That can make things easier to troubleshoot, but it can also make things noisy.
+
+ Using the `-c <name>` option will limit it to just that one container.
 
 == What Is Running Inside
 
@@ -116,31 +128,13 @@ USER        PID         PPID        %CPU        ELAPSED       TTY         TIME  
 65532       1           0           0.000       4.2s          ?           0s          /usr/bin/valkey-server *:6379
 ----
 
-The processes of every container in the pod, in one table — no shell required. The first row is the infra container's tiny process holding the pod open; the frontend is gunicorn with its two workers; the store is valkey's server process. Note the two PID 1s: each container has its own PID namespace — the pod shares the network namespace, not every namespace. When a piece misbehaves, this is how you see inside it without a shell.
+You get a full table of all of the processes in each of the containers of the pod in one place.
+Notice that there are 3 PID 1s.
+Each container still gets it's own PID namespace, the pod doesn't create all of the namespaces as shared.
 
-== Restart a Piece
 
-The pod operates as one thing — and individual pieces can still be operated on inside it. A piece misbehaves; restart it without touching the rest of the application:
 
-[source,bash,role=execute]
-----
-podman restart web
-----
-
-[source,bash,role=execute]
-----
-podman pod ps
-----
-
-[source,text]
-----
-POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
-7f6e5d4c3b2a  webapp      Running     6 minutes ago   c1d2e3f4a5b6  3
-----
-
-The pod never stopped — the frontend restarted inside it, and the other pieces were never touched. The restart is one command: no container removal, no re-running the original command, the piece comes back inside the same pod.
-
-For how much the application is using, the pod answers in one command:
+We can also see the full resource picture of the application through the pod view.
 
 [source,bash,role=execute]
 ----
@@ -157,9 +151,33 @@ POD           CID           NAME                CPU %       MEM USAGE/ LIMIT   M
 
 The resource usage of the whole application — CPU, memory, network I/O, one row per container — in one command. One pod, one view.
 
+== Restart a Piece
+
+If we're supposed to think of this pod as one unit, can we still bounce the web server like we would in a reguar service or do we have to take the whole pod down?
+
+[source,bash,role=execute]
+----
+podman restart web
+----
+
+[source,bash,role=execute]
+----
+podman pod logs -c web
+----
+
+[source,text]
+----
+----
+
+We get the overall management of the application, but we can still operate on specific componets if we need to.
+
 == Replace a Piece
 
-Restarting keeps the same container. Replacing it is different: a stopped container is not a removed container — stopping the store leaves it behind, Exited, still holding its name. Removing it frees the name, and a fresh container takes its place:
+Restarting keeps the same container, but what if we had an updated container and needed to replace a component?
+
+A stopped container isn't removed. 
+It's down but not gone.
+We need to remove it in order to replace it.
 
 [source,bash,role=execute]
 ----
@@ -171,6 +189,21 @@ podman stop store
 podman rm store
 ----
 
+Check the state of our pod without the `store`
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Running     8 minutes ago   c1d2e3f4a5b6  2
+----
+
+Now launch a new `store` container.
+For purposes of the lab, we're using the same image but the outcome would be the same if `latest` here was newer.
 [source,bash,role=execute]
 ----
 podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
@@ -189,13 +222,14 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 7f6e5d4c3b2a  webapp      Running     8 minutes ago   c1d2e3f4a5b6  3
 ----
 
-The pod never stopped: the new store container joined the pod's shared localhost, and the frontend found it the way it found the old one.
+The pod never stopped: the new `store` container joined the pod and the webapp found it the way it found the old one.
 
 Reload the page in your browser: the count went back to `1`.
 
 image::webcounter-replace.png[]
 
-The store's state lived in the container that was replaced. The pod kept running; only the piece changed.
+The state lived in the container that was replaced. 
+The pod kept running, but the data in the original container was lost.
 
 == Take the Application Down
 
@@ -206,4 +240,9 @@ The whole application comes down the way it went up — one pod, one command:
 podman pod stop webapp && podman pod rm webapp
 ----
 
-One command stopped and removed the infra container and every piece in it. The application is one thing, and it comes down as one thing — which is what "one application" means.
+Grouping containers in logical units gives us a useful way to treat them as a single application.
+We've only done the basics of pod management in this lab, but this can make managing containerized applications comprised of multiple components much easier.
+Communitcation via shared namespace is one benefit, but resource controls can also be set once instead of for each container.
+
+With containers grouped together, creating system services from them becomes a lot easier as well.
+Check out our other labs to see how `quadlets` can quickly take your pods into services and how they lend themselves to automation.

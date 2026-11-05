@@ -1,71 +1,76 @@
 = Two Containers, One Application
 
-Your web service is two pieces. There is a web frontend that serves pages, and a data store that holds its state. For lifecycle management the pieces run as two containers: they are built, updated, and fail together — and to work at all, they need to communicate.
+Real world services are usually made up of more than one component.
+There is a web frontend that serves pages, and a data store that holds its state. 
+Typically each of these would be pacakged as a separate container, so who do we treat them as a single application instead?
 
-In this module you will connect the pieces: a Podman network gives them somewhere to find each other, and their container names give them a way.
+In this lab, you'll look at how to connect the pieces into a single unit that can communicate the same way they would if on a single host.
 
-The images this lab uses are minimal: no shell, no package manager, running as non-root users on unprivileged ports. You configure them with environment variables, and you work with them from the outside — there is no logging into these containers.
+The images this lab uses are minimal: no shell, no package manager, running as non-root users on unprivileged ports. 
+The application is a simple gunicorn frontend that reads and stores data in a valkey database.
+There are simple configuration options availble via environment variables.
 
-== Verify the Podman Installation
+== The configuration we need
 
-Confirm the version of Podman on this system.
-
-[source,bash,role=execute]
-----
-podman --version
-----
-
-[source,text]
-----
-podman version 5.x.x
-----
-
-Podman 5 is the current major version on RHEL 10.
-
-== Create a Network
-
-The frontend needs to talk to the store: it reads its state from the store on every page load. The store's location is the `STORE_HOST` environment variable — and when `STORE_HOST` is not defined, it is `localhost`, the frontend's own container. What it has, so far, is Podman's default network:
+The gunicorn `web` container gets the address of the valkey `store` container in two ways.
+Either the store's location is in the `STORE_HOST` environment variable or when that's not defined, it is `localhost`.
+The valkey server is configured to only listen on `localhost`.
+Since this container networking, that refers to `localhost` inside of the container, not from the host view.
 
 ----
 +------------------------------------------------------------------+
 |                              host                                |
 |                                                                  |
 |   +-------------------------------+  +---------------------+     |
-|   |  web                          |  |  store              |     |
+|   |           web                 |  |       store         |     |
 |   |  gunicorn :8000               |  |  valkey :6379       |     |
 |   |                               |  |                     |     |
-|   |  reads its state from the     |  |  listening on       |     |
-|   |  store at STORE_HOST:6379     |  |  its own localhost  |     |
-|   |                               |  |                     |     |
-|   |  STORE_HOST defaults to       |  |                     |     |
-|   |  localhost:6379               |  |                     |     |
+|   |  store at STORE_HOST:6379     |  |  listens on         |     |
+|   |                               |  |  localhost          |     |
 |   +-------------------------------+  +---------------------+     |
 +------------------------------------------------------------------+
 ----
 
-So the frontend's default target — its own localhost:6379 — is where no store is: from inside the web container, `localhost` is the web, not the store. And the store's assigned address changes every time its container is recreated. What the frontend needs is a name for the store, on a network both containers join. The simplest way is a Podman network:
+Not only will these containers have isolated networks by default, they'll also get different IPs every time they're restarted.
+We want to be able to refer to them by "hostnames", or rather the assigned container name.
 
+== Create a new network
+
+One important way that user-defined networks differ from the `default` network is `podman` will provide DNS resolution for container names. 
+
+We can create a new network with `podman` these two containers will be able to join.
 [source,bash,role=execute]
 ----
 podman network create app-net
 ----
 
-A user-defined network is different: containers join it by choice, and Podman runs DNS on it so container names resolve.
 
 == Run the Frontend
 
-Run the frontend on the new network. The `--rm` flag removes a container automatically when it stops, so these containers never need to be cleaned up by hand. The store location is an environment variable, read when the container starts:
+Launching this container is just like any other, we provide some options to provide the name, publish a port, and to join a specific network.
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name web -p 8000:8000 --network app-net -e STORE_HOST=store ghcr.io/rhel-labs/webcounter-app:latest
+podman run -d --rm \
+  --name web -p 8000:8000 \
+  -e STORE_HOST=store \
+  --network app-net \
+  ghcr.io/rhel-labs/webcounter-app:latest
 ----
+.The flags
+* -d        run in the background
+* --rm      remove on exit
+* --name    assign the resolvable name
+* -p        publish ports, format `host port:container port`
+* -e        set the environment variable
+* --network join the named network instead of `default`
 
-One piece of configuration: `STORE_HOST=store` — the store's container name. The frontend is now set to find its store by name on this network, and no container by that name is on it yet.
+Since we passed the environment variable, the application will now be looking for a host named `store` instead of `localhost`. 
+We've published the port the application listens on so we will be able to connect to it from the outside world.
 
 == Check the Log
 
-There is no shell to enter in these images — what the application writes to its logs is the debugging surface. Check it:
+We can pull up the logs to see what the application reports from inside it's containerized view of the world.
 
 [source,bash,role=execute]
 ----
@@ -83,19 +88,29 @@ podman logs web
 [store unreachable] Error -2 connecting to store:6379. Name or service not known.
 ----
 
-The name `store` does not resolve. The frontend is on the network, but nothing by that name is — DNS on a user-defined network resolves container names, and only for containers on that network.
+The application is up and looking for valkey via hostname like we expect.
+Now we need to get the `store` container in place.
 
 == Start the Store
 
-The store has to know about the network too. A container learns its networks when it starts, so the store joins `app-net` the same way the frontend did — and it needs one flag. Valkey's protected mode only accepts connections from its own loopback; the frontend connects over the network, which is a remote connection as far as the store is concerned — so protected mode is turned off:
+The `store` container will learn about its network the same way as the web frontend, the `--network` flag.
+Otherwise, there's no other options for `podman` to add.
+By design in this image, valkey's protected mode only accepts connections from its loopback.
+We can pass arguments to `valkey` after the name of the image, this will disable protected mode.
+Many other images and applications can take arguments to their `CMD`, but refer to the documenation for each one.
+The important takeaway is that everything up to the image name is an option for `podman` and everything after it gets passed to the image at startup.
 
 [source,bash,role=execute]
 ----
-podman run -d --rm --name store --network app-net registry.access.redhat.com/hi/valkey:latest --protected-mode no
+podman run -d --rm \
+  --name store \
+  --network app-net \
+  registry.access.redhat.com/hi/valkey:latest --protected-mode no
 ----
 
 == Networking Works
 
+Did we get these two talking?
 Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
 
 image::webcounter.png[]
@@ -105,13 +120,27 @@ If you are using a Chromium based browser, recent changes to the default HSTS po
 Edit the URL in the address bar to `http://` and reload the page. This should tell the browser to keep this URL as HTTP for the rest of the lab.
 ====
 
-The page renders: *WebCounter*, and a count of page views — `1`, served from the store at `store:6379`. Reload and the count increments: the startup log's unresolvable name now answers on every page load. The frontend reaches the store at `store:6379`, the container's name resolved through the network's DNS: two containers on a shared network, finding each other by name, talking on every page load.
+The page renders: *WebCounter*, and a count of page views — `1`.
+Try reloading the page, the web app should write and read the page view count from the `valkey` store.
+Pull up the application logs again and notice there's no more connection errors.
 
-== Two Containers Are Still Two Containers
+[source,bash,role=execute]
+----
+podman logs web
+----
 
-Networking solved communication. Look at what you are managing, though: two separate start commands, two lifecycles to stop and start, a store name wired into an environment variable, the frontend's port published container by container. As an application, the pieces are not coordinated — they are two containers that happen to be on the same network.
+[source,text]
+----
+[2026-10-20 13:29:02 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-10-20 13:29:02 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-10-20 13:29:02 +0000] [1] [INFO] Using worker: sync
+[2026-10-20 13:29:02 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-10-20 13:29:02 +0000] [3] [INFO] Booting worker with pid: 3
+[store unreachable] Error -2 connecting to store:6379. Name or service not known.
+[store unreachable] Error -2 connecting to store:6379. Name or service not known.
+----
 
-Two lifecycles means two stop commands, in the right order — and because these containers were throwaways, stopping removes them:
+Go ahead and stop the containers and remove the network.
 
 [source,bash,role=execute]
 ----
@@ -123,7 +152,18 @@ podman stop web store
 web
 store
 ----
+[source,bash,role=execute]
+----
+podman network rm app-net
+----
 
-Both containers are gone, and nothing needs cleaning up by hand. But the application they made up is gone with them: two containers that happen to be on the same network have no existence apart from the processes running them.
+== Two Containers Are Still Two Containers
 
-An application is one thing: one lifecycle, one network view, hostnames the pieces agree on. That is what the next module adds.
+Networking solved communication betwen our two components. 
+As an application, the pieces are not coordinated, they are two containers that happen to be on the same network.
+We needed two separate commands to start them, environment variables to configure, and a network to manually manage.
+
+
+An application is one thing: one lifecycle, one network view, hostnames the pieces agree on. 
+Let's explore an approach in the next exercise that makes these two components into a more cohesive thing, a `pod`.
+

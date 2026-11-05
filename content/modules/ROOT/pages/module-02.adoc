@@ -1,18 +1,20 @@
 = Grouping Containers into Pods
 
-The application communicates: two containers on a shared network, finding each other by name on every page load. But as an application it is not coordinated — two lifecycles, a store name wired in by environment variable, a port published per container. In this module you will group the pieces into a pod, and the pod will solve the coordination.
+Where before we took two separate containers and provided them a shared network to use, a `pod` provides a common namespace.
+A pod is a group of containers that share a set of resources and a single way to run them.
 
 == Create a Pod
 
+To create our `pod` we'll provide a name and the port mapping.
 [source,bash,role=execute]
 ----
 podman pod create --name webapp -p 8000:8000
 ----
 
-A pod is a group of containers that share a single network namespace — one IP address, one localhost, one lifecycle. Note where the port went: on the pod, not on any container. Port publishing is a property of the pod's network namespace, held by the infra container and shared by every container in it.
+Note where the port went: on the pod, not on any one container. 
+Port publishing is now a property of the pod's network namespace.
 
-You now have an empty pod:
-
+You can list the pods on a system and their status.
 [source,bash,role=execute]
 ----
 podman pod ps
@@ -25,32 +27,44 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 ----
 
 Notice the `# OF CONTAINERS` column: the pod already contains one container that you did not start.
+The `Created` status means there aren't any started or stopped containers.
+The `NAME` column holds the one we assigned at creation. 
+The one container shown is a special infrastructure container managed by podman.
+This is how our namespace gets created before we have added any of our application compontents.
 
 == Run the Pieces Inside the Pod
 
-Run both pieces inside the pod — and note what is missing: no `--rm` this time. In module-01 the containers were throwaway, removed the moment they stopped. These pieces are the application, and the application is something you will stop and start again — its pieces have to still be there. Adding a container to a pod takes a single flag:
+We can use `podman run` to start each of our containers in the new `pod`. 
+However they'll look a little different this time.
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --name web ghcr.io/rhel-labs/webcounter-app:latest
+podman run --pod webapp -d \
+  --name web ghcr.io/rhel-labs/webcounter-app:latest
 ----
 
 [source,bash,role=execute]
 ----
-podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
+podman run --pod webapp -d \
+  --name store registry.access.redhat.com/hi/valkey:latest
 ----
 
-No environment variable, no network join — and no `--protected-mode no` this time. Inside the pod the pieces share one network namespace: the frontend's connection arrives on the store's own loopback, and valkey accepts loopback connections even in protected mode. The store listens on 6379, and `localhost` is the coordinated hostname — the pieces agree on it because they share the pod's network view.
+No published port, no environment variable, no network join and no `--protected-mode no` this time. 
+Remeber that we said everything defaults to trying to communicate via `localhost`.
+Inside the pod the pieces share one network namespace: the frontend's connection arrives on the store's shared `localhost`, and valkey accepts loopback connections even in protected mode. 
 
-The pod is one application, and it is already talking. Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`, served from the store at `localhost:6379`.
+The pod is one application, and it is already talking. 
+Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`.
 
 image::webcounter-pod.png[]
 
 No connection was configured — no environment variable pointed the frontend at the store, no network was created, no ports opened between the pieces. They share one localhost, and that is the whole configuration.
 
+Go ahead and refresh the page a few times and watch the counter to make sure the application is operating as expected.
+
 == The Infra Container
 
-There is a third container:
+Let's go back to that third container.
 
 [source,bash,role=execute]
 ----
@@ -65,9 +79,10 @@ CONTAINER ID  IMAGE                                        COMMAND              
 066f5d153c67  registry.access.redhat.com/hi/valkey:latest                        3 seconds ago  Up 3 seconds  0.0.0.0:8000->8000/tcp, 6379/tcp  store
 ----
 
-`4408f687415b-infra` is the infra container — and it *is* the pod. Podman created it when you created the pod; the listing shows no image or command for it because it is podman's own plumbing. It runs a tiny process whose only job is to hold open the namespaces the pod's containers share — the network namespace in particular. Because `web` and `store` join the infra container's namespaces instead of creating their own, they share one IP address and one localhost.
-
-The infra container is why pods work: it exists for as long as the pod does, and every container in the pod comes and goes inside the boundaries it holds. When the pod stops, the infra container stops, and the shared network view disappears with it.
+`4408f687415b-infra` is the infra container — and it *is* the pod. 
+Podman created it when you created the pod; the listing shows no image or command for it because it is podman's own plumbing. 
+It runs a tiny process whose only job is to hold open the namespaces the pod's containers share — the network namespace in particular. 
+Because `web` and `store` join the infra container's namespaces instead of creating their own, they share one IP address and one localhost.
 
 == One Application
 
@@ -75,7 +90,7 @@ The infra container is why pods work: it exists for as long as the pod does, and
 
 [source,bash,role=execute]
 ----
-podman pod ps
+podman pod ps --ctr-names
 ----
 
 [source,text]
@@ -84,7 +99,8 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 7f6e5d4c3b2a  webapp      Running     3 minutes ago   c1d2e3f4a5b6  3
 ----
 
-Inspect the pod, filtered to the state of the application:
+Detailed configuration and state can be found using `inspect` and limited using the `format` option.
+There's a lot information available, but let's just check that count again.
 
 [source,bash,role=execute]
 ----
@@ -95,8 +111,6 @@ podman pod inspect webapp --format '{{.State}} {{.NumContainers}}'
 ----
 Running 3
 ----
-
-Running, with three containers: the two pieces and the infra container. One line — the state of the whole application.
 
 == Only the Right Port Opens
 
