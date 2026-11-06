@@ -30,7 +30,7 @@ Notice the `# OF CONTAINERS` column: the pod already contains one container that
 The `Created` status means there aren't any started or stopped containers.
 The `NAME` column holds the one we assigned at creation. 
 The one container shown is a special infrastructure container managed by podman.
-This is how our namespace gets created before we have added any of our application compontents.
+This is how our namespace gets created before we have added any of our application components.
 
 == Run the Pieces Inside the Pod
 
@@ -50,11 +50,11 @@ podman run --pod webapp -d \
 ----
 
 No published port, no environment variable, no network join and no `--protected-mode no` this time. 
-Remeber that we said everything defaults to trying to communicate via `localhost`.
+Remember that we said everything defaults to trying to communicate via `localhost`.
 Inside the pod the pieces share one network namespace: the frontend's connection arrives on the store's shared `localhost`, and valkey accepts loopback connections even in protected mode. 
 
 The pod is one application, and it is already talking. 
-Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starting at `1`.
+Open http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser: the page renders, the count starts at `1`.
 
 image::webcounter-pod.png[]
 
@@ -79,14 +79,14 @@ CONTAINER ID  IMAGE                                        COMMAND              
 066f5d153c67  registry.access.redhat.com/hi/valkey:latest                        3 seconds ago  Up 3 seconds  0.0.0.0:8000->8000/tcp, 6379/tcp  store
 ----
 
-`4408f687415b-infra` is the infra container — and it *is* the pod. 
+`4408f687415b-infra` with no source image is the infra container — and it *is* the pod. 
 Podman created it when you created the pod; the listing shows no image or command for it because it is podman's own plumbing. 
 It runs a tiny process whose only job is to hold open the namespaces the pod's containers share — the network namespace in particular. 
 Because `web` and `store` join the infra container's namespaces instead of creating their own, they share one IP address and one localhost.
 
 == One Application
 
-`podman pod ps` gives the summary view:
+`podman pod ps` gives different options for the view, like including the names of each container:
 
 [source,bash,role=execute]
 ----
@@ -95,12 +95,12 @@ podman pod ps --ctr-names
 
 [source,text]
 ----
-POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
-7f6e5d4c3b2a  webapp      Running     3 minutes ago   c1d2e3f4a5b6  3
+POD ID        NAME        STATUS      CREATED             INFRA ID      NAMES
+557a30e288c6  webapp      Running     About a minute ago  d2e3cfd4b789  557a30e288c6-infra,web,store
 ----
 
 Detailed configuration and state can be found using `inspect` and limited using the `format` option.
-There's a lot information available, but let's just check that count again.
+There's a lot of information available, but let's just check that count again.
 
 [source,bash,role=execute]
 ----
@@ -112,24 +112,9 @@ podman pod inspect webapp --format '{{.State}} {{.NumContainers}}'
 Running 3
 ----
 
-== Only the Right Port Opens
+We have the same outcome as our manual networking, but with some improvements.
+Port 8000 was published once, at the pod level, for the whole application.
+We can see and manage the application as a whole now, without needing to pass variables or pass commands to an application.
 
-The store lives in the same pod as a reachable service. Try it from the host anyway:
-
-[source,bash,role=execute]
-----
-curl http://localhost:6379
-----
-
-[source,text]
-----
-curl: (7) Failed to connect to localhost port 6379 after 0 ms: Couldn't connect to server
-----
-
-Only port 8000 was published — once, at the pod level, for the whole application. The pod exposes exactly what you told it to. The same isolation you relaxed for the frontend is still keeping the store private.
-
-Reload the page in the browser: the count increments. There is no other path into the store — the only connection between the pieces is the one they were born with, the pod's own localhost.
-
-The count proves the pieces talk. Compare the two setups: on a network, the frontend needed a network join and an environment variable; in the pod, it needed a flag. The pod solved the networking by removing it — one lifecycle, one network view, one hostname the pieces agree on.
-
-The application is one pod. The next module: managing it.
+This is good, but we can take this further.
+In the next exercise, we'll go deeper into the pod makeup.

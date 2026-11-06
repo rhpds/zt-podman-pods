@@ -1,13 +1,13 @@
 = Managing the Pod
 
 Now that we have the application in a pod, how do we manage it?
-When it was two separate containers, we had to do that individually and coordinated by hand.
+When it was two separate containers, we had to do that individually and coordinate them by hand.
 This module will look at how containers run (and stop) inside a pod and how we can still individually control them if needed.
 
 == Stop the Application, Start It Again
 
 An application has one lifecycle. 
-Stopping it should be one command, and it shoudl stop every component.
+Stopping it should be one command, and it should stop every component.
 
 [source,bash,role=execute]
 ----
@@ -56,58 +56,34 @@ podman pod logs -n webapp
 
 [source,text]
 ----
-ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Starting gunicorn 23.0.0
-ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
-ef078db4d6c5 [2026-10-20 19:45:13 +0000] [1] [INFO] Using worker: sync
-ef078db4d6c5 [2026-10-20 19:45:13 +0000] [2] [INFO] Booting worker with pid: 2
-ef078db4d6c5 [2026-10-20 19:45:13 +0000] [3] [INFO] Booting worker with pid: 3
-ef078db4d6c5 [store unreachable] Error 111 connecting to localhost:6379. Connection refused.
-ef078db4d6c5 [store unreachable] Error 111 connecting to localhost:6379. Connection refused.
-ef078db4d6c5 [2026-10-20 19:47:42 +0000] [1] [INFO] Handling signal: term
-ef078db4d6c5 [2026-10-20 19:47:42 +0000] [3] [INFO] Worker exiting (pid: 3)
-ef078db4d6c5 [2026-10-20 19:47:42 +0000] [2] [INFO] Worker exiting (pid: 2)
-ef078db4d6c5 [2026-10-20 19:47:42 +0000] [1] [INFO] Shutting down: Master
-ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Starting gunicorn 23.0.0
-ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
-ef078db4d6c5 [2026-10-20 19:47:48 +0000] [1] [INFO] Using worker: sync
-ef078db4d6c5 [2026-10-20 19:47:48 +0000] [2] [INFO] Booting worker with pid: 2
-ef078db4d6c5 store reached at localhost:6379
-ef078db4d6c5 [2026-10-20 19:47:48 +0000] [3] [INFO] Booting worker with pid: 3
-ef078db4d6c5 store reached at localhost:6379
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.775 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * Valkey version=9.0.6, bits=64, commit=00000000, modified=0, pid=1, just started
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.776 * monotonic clock: POSIX clock_gettime
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Running mode=standalone, port=6379.
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Server initialized
-3e40325e2a90 1:M 20 Oct 2026 19:45:14.778 * Ready to accept connections tcp
-3e40325e2a90 1:signal-handler (1792525662) Received SIGTERM scheduling shutdown...
-3e40325e2a90 1:M 20 Oct 2026 19:47:42.559 * User requested shutdown...
-3e40325e2a90 1:M 20 Oct 2026 19:47:42.560 * Saving the final RDB snapshot before exiting.
-3e40325e2a90 1:M 20 Oct 2026 19:47:42.567 * DB saved on disk
-3e40325e2a90 1:M 20 Oct 2026 19:47:42.567 # Valkey is now ready to exit, bye bye...
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.029 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 * Valkey version=9.0.6, bits=64, commit=00000000, modified=0, pid=1, just started
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.031 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.032 * monotonic clock: POSIX clock_gettime
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.033 * Running mode=standalone, port=6379.
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.034 * Server initialized
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Cleaning slot migration log in anticipation of a load operation.
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Loading RDB produced by Valkey version 9.0.6
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * RDB age 6 seconds
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * RDB memory usage when created 0.88 Mb
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Done loading RDB, keys loaded: 1, keys expired: 0.
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * DB loaded from disk: 0.001 seconds
-3e40325e2a90 1:M 20 Oct 2026 19:47:48.036 * Ready to accept connections tcp
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Starting gunicorn 23.0.0
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Using worker: sync
+web [2026-11-06 21:32:49 +0000] [2] [INFO] Booting worker with pid: 2
+web [2026-11-06 21:32:50 +0000] [3] [INFO] Booting worker with pid: 3
+web store reached at localhost:6379
+web store reached at localhost:6379
+store 1:M 06 Nov 2026 21:32:49.860 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+store 1:M 06 Nov 2026 21:32:49.861 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
+store 1:M 06 Nov 2026 21:32:49.861 * Valkey version=9.0.7, bits=64, commit=00000000, modified=0, pid=1, just started
+store 1:M 06 Nov 2026 21:32:49.861 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
+store 1:M 06 Nov 2026 21:32:49.861 * monotonic clock: POSIX clock_gettime
+store 1:M 06 Nov 2026 21:32:49.866 * Running mode=standalone, port=6379.
+store 1:M 06 Nov 2026 21:32:49.867 * Server initialized
+store 1:M 06 Nov 2026 21:32:49.869 * Cleaning slot migration log in anticipation of a load operation.
+store 1:M 06 Nov 2026 21:32:49.869 * Loading RDB produced by Valkey version 9.0.7
+store 1:M 06 Nov 2026 21:32:49.869 * RDB age 7 seconds
+store 1:M 06 Nov 2026 21:32:49.869 * RDB memory usage when created 0.89 Mb
+store 1:M 06 Nov 2026 21:32:49.869 * Done loading RDB, keys loaded: 1, keys expired: 0.
+store 1:M 06 Nov 2026 21:32:49.869 * DB loaded from disk: 0.000 seconds
+store 1:M 06 Nov 2026 21:32:49.869 * Ready to accept connections tcp
 ----
 
 Each line is prefixed with the name of the container it came from: the frontend's full history, then the store's. 
 Everything the application has done so far is in there: the startup pings that fired before the store was listening, the graceful SIGTERM shutdown on both sides, and the store saving its final RDB snapshot before it exited — then loading it back on start, the data coming back with the container. 
 That can make things easier to troubleshoot, but it can also make things noisy.
 
- Using the `-c <name>` option will limit it to just that one container.
+NOTE: Using the `-c <name>` option will limit it to just that one container.
 
 == What Is Running Inside
 
@@ -130,7 +106,7 @@ USER        PID         PPID        %CPU        ELAPSED       TTY         TIME  
 
 You get a full table of all of the processes in each of the containers of the pod in one place.
 Notice that there are 3 PID 1s.
-Each container still gets it's own PID namespace, the pod doesn't create all of the namespaces as shared.
+Each container still gets its own PID namespace, the pod doesn't create all of the namespaces as shared.
 
 
 
@@ -153,23 +129,53 @@ The resource usage of the whole application — CPU, memory, network I/O, one ro
 
 == Restart a Piece
 
-If we're supposed to think of this pod as one unit, can we still bounce the web server like we would in a reguar service or do we have to take the whole pod down?
+If we're supposed to think of this pod as one unit, can we still bounce the web server like we would in a regular service or do we have to take the whole pod down?
 
 [source,bash,role=execute]
 ----
 podman restart web
 ----
 
+All of the logs for each restart are available for the `web` container.
 [source,bash,role=execute]
 ----
-podman pod logs -c web
+podman pod logs webapp -c web
 ----
 
 [source,text]
 ----
+[2026-11-06 21:22:19 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:22:19 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:22:19 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:22:19 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-06 21:22:19 +0000] [3] [INFO] Booting worker with pid: 3
+[store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+[store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+[2026-11-06 21:32:42 +0000] [1] [INFO] Handling signal: term
+[2026-11-06 21:32:42 +0000] [3] [INFO] Worker exiting (pid: 3)
+[2026-11-06 21:32:42 +0000] [2] [INFO] Worker exiting (pid: 2)
+[2026-11-06 21:32:42 +0000] [1] [INFO] Shutting down: Master
+[2026-11-06 21:32:49 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:32:49 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:32:49 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:32:49 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-06 21:32:50 +0000] [3] [INFO] Booting worker with pid: 3
+store reached at localhost:6379
+store reached at localhost:6379
+[2026-11-06 21:35:11 +0000] [1] [INFO] Handling signal: term
+[2026-11-06 21:35:11 +0000] [3] [INFO] Worker exiting (pid: 3)
+[2026-11-06 21:35:11 +0000] [2] [INFO] Worker exiting (pid: 2)
+[2026-11-06 21:35:11 +0000] [1] [INFO] Shutting down: Master
+[2026-11-06 21:35:11 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:35:11 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:35:11 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:35:11 +0000] [2] [INFO] Booting worker with pid: 2
+store reached at localhost:6379
+[2026-11-06 21:35:11 +0000] [3] [INFO] Booting worker with pid: 3
+store reached at localhost:6379
 ----
 
-We get the overall management of the application, but we can still operate on specific componets if we need to.
+We get the overall management of the application, but we can still operate on specific components if we need to.
 
 == Replace a Piece
 
@@ -224,7 +230,8 @@ POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAIN
 
 The pod never stopped: the new `store` container joined the pod and the webapp found it the way it found the old one.
 
-Reload the page in your browser: the count went back to `1`.
+Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
+The count resets to 1.
 
 image::webcounter-replace.png[]
 
@@ -242,7 +249,7 @@ podman pod stop webapp && podman pod rm webapp
 
 Grouping containers in logical units gives us a useful way to treat them as a single application.
 We've only done the basics of pod management in this lab, but this can make managing containerized applications comprised of multiple components much easier.
-Communitcation via shared namespace is one benefit, but resource controls can also be set once instead of for each container.
+Communication via shared namespace is one benefit, but resource controls can also be set once instead of for each container.
 
 With containers grouped together, creating system services from them becomes a lot easier as well.
 Check out our other labs to see how `quadlets` can quickly take your pods into services and how they lend themselves to automation.
