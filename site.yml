@@ -2,7 +2,7 @@
 site:
   title: "Create and Manage Podman Pods"
   url: https://github.com/rhpds/showroom_template_zero
-  start_page: modules::01-step1.adoc
+  start_page: modules::module-01.adoc
 
 content:
   sources:

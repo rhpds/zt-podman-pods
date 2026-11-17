@@ -1,0 +1,255 @@
+= Managing the Pod
+
+Now that we have the application in a pod, how do we manage it?
+When it was two separate containers, we had to do that individually and coordinate them by hand.
+This module will look at how containers run (and stop) inside a pod and how we can still individually control them if needed.
+
+== Stop the Application, Start It Again
+
+An application has one lifecycle. 
+Stopping it should be one command, and it should stop every component.
+
+[source,bash,role=execute]
+----
+podman pod stop webapp
+----
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Exited      5 minutes ago   c1d2e3f4a5b6  3
+----
+
+Once it's been defined, the whole pod now operates as a single unit.
+We can now think about this as the `webapp` instead of the application made up of the `web` and `store` containers.
+
+Starting it is one command too:
+
+[source,bash,role=execute]
+----
+podman pod start webapp
+----
+
+The published port comes back with the pod. 
+Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
+The page renders again, and the count kept going from where you left it.
+
+image::webcounter-pod-start.png[]
+
+The store is the same container it was before the stop and its data is still in the container.
+What actually resets the count is replacing the store, which is the next lesson.
+
+== Logs: One Command, Every Container
+
+We saw the `web` container logs earlier when looking at the network, we can do something similar but at the pod level.
+This will give us logs for everything, not just the `web`.
+
+[source,bash,role=execute]
+----
+podman pod logs -n webapp
+----
+
+[source,text]
+----
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Starting gunicorn 23.0.0
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+web [2026-11-06 21:32:49 +0000] [1] [INFO] Using worker: sync
+web [2026-11-06 21:32:49 +0000] [2] [INFO] Booting worker with pid: 2
+web [2026-11-06 21:32:50 +0000] [3] [INFO] Booting worker with pid: 3
+web store reached at localhost:6379
+web store reached at localhost:6379
+store 1:M 06 Nov 2026 21:32:49.860 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+store 1:M 06 Nov 2026 21:32:49.861 * oO0OoO0OoO0Oo Valkey is starting oO0OoO0OoO0Oo
+store 1:M 06 Nov 2026 21:32:49.861 * Valkey version=9.0.7, bits=64, commit=00000000, modified=0, pid=1, just started
+store 1:M 06 Nov 2026 21:32:49.861 # Warning: no config file specified, using the default config. In order to specify a config file use /usr/bin/valkey-server /path/to/valkey.conf
+store 1:M 06 Nov 2026 21:32:49.861 * monotonic clock: POSIX clock_gettime
+store 1:M 06 Nov 2026 21:32:49.866 * Running mode=standalone, port=6379.
+store 1:M 06 Nov 2026 21:32:49.867 * Server initialized
+store 1:M 06 Nov 2026 21:32:49.869 * Cleaning slot migration log in anticipation of a load operation.
+store 1:M 06 Nov 2026 21:32:49.869 * Loading RDB produced by Valkey version 9.0.7
+store 1:M 06 Nov 2026 21:32:49.869 * RDB age 7 seconds
+store 1:M 06 Nov 2026 21:32:49.869 * RDB memory usage when created 0.89 Mb
+store 1:M 06 Nov 2026 21:32:49.869 * Done loading RDB, keys loaded: 1, keys expired: 0.
+store 1:M 06 Nov 2026 21:32:49.869 * DB loaded from disk: 0.000 seconds
+store 1:M 06 Nov 2026 21:32:49.869 * Ready to accept connections tcp
+----
+
+Each line is prefixed with the name of the container it came from: the frontend's full history, then the store's. 
+Everything the application has done so far is in there: the startup pings that fired before the store was listening, the graceful SIGTERM shutdown on both sides, and the store saving its final RDB snapshot before it exited — then loading it back on start, the data coming back with the container. 
+That can make things easier to troubleshoot, but it can also make things noisy.
+
+NOTE: Using the `-c <name>` option will limit it to just that one container.
+
+== What Is Running Inside
+
+Logs show what the applications said. For what they are doing, the pod answers in one command:
+
+[source,bash,role=execute]
+----
+podman pod top webapp
+----
+
+[source,text]
+----
+USER        PID         PPID        %CPU        ELAPSED       TTY         TIME        COMMAND
+0           1           0           0.000       5.2s          ?           0s          /catatonit -P
+65532       1           0           0.000       5.2s          ?           0s          /app/venv/bin/python3 /app/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 app:app
+65532       2           1           0.000       4.2s          ?           0s          /app/venv/bin/python3 /app/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 app:app
+65532       3           1           0.000       4.2s          ?           0s          /app/venv/bin/python3 /app/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 app:app
+65532       1           0           0.000       4.2s          ?           0s          /usr/bin/valkey-server *:6379
+----
+
+You get a full table of all of the processes in each of the containers of the pod in one place.
+Notice that there are 3 PID 1s.
+Each container still gets its own PID namespace, the pod doesn't create all of the namespaces as shared.
+
+
+
+We can also see the full resource picture of the application through the pod view.
+
+[source,bash,role=execute]
+----
+podman pod stats webapp --no-stream
+----
+
+[source,text]
+----
+POD           CID           NAME                CPU %       MEM USAGE/ LIMIT   MEM %       NET IO       BLOCK IO    PIDS
+4408f687415b  3873ce2b0dc5  4408f687415b-infra  0.19%       278.5kB / 33.27GB  0.00%       258B / 542B  -- / --     1
+4408f687415b  00335c55bc34  web                 9.54%       40.51MB / 33.27GB  0.12%       258B / 542B  -- / --     3
+4408f687415b  066f5d153c67  store               1.13%       4.231MB / 33.27GB  0.01%       258B / 542B  -- / --     6
+----
+
+The resource usage of the whole application — CPU, memory, network I/O, one row per container — in one command. One pod, one view.
+
+== Restart a Piece
+
+If we're supposed to think of this pod as one unit, can we still bounce the web server like we would in a regular service or do we have to take the whole pod down?
+
+[source,bash,role=execute]
+----
+podman restart web
+----
+
+All of the logs for each restart are available for the `web` container.
+[source,bash,role=execute]
+----
+podman pod logs webapp -c web
+----
+
+[source,text]
+----
+[2026-11-06 21:22:19 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:22:19 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:22:19 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:22:19 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-06 21:22:19 +0000] [3] [INFO] Booting worker with pid: 3
+[store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+[store unreachable] Error 111 connecting to localhost:6379. Connection refused.
+[2026-11-06 21:32:42 +0000] [1] [INFO] Handling signal: term
+[2026-11-06 21:32:42 +0000] [3] [INFO] Worker exiting (pid: 3)
+[2026-11-06 21:32:42 +0000] [2] [INFO] Worker exiting (pid: 2)
+[2026-11-06 21:32:42 +0000] [1] [INFO] Shutting down: Master
+[2026-11-06 21:32:49 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:32:49 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:32:49 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:32:49 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-06 21:32:50 +0000] [3] [INFO] Booting worker with pid: 3
+store reached at localhost:6379
+store reached at localhost:6379
+[2026-11-06 21:35:11 +0000] [1] [INFO] Handling signal: term
+[2026-11-06 21:35:11 +0000] [3] [INFO] Worker exiting (pid: 3)
+[2026-11-06 21:35:11 +0000] [2] [INFO] Worker exiting (pid: 2)
+[2026-11-06 21:35:11 +0000] [1] [INFO] Shutting down: Master
+[2026-11-06 21:35:11 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-06 21:35:11 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-06 21:35:11 +0000] [1] [INFO] Using worker: sync
+[2026-11-06 21:35:11 +0000] [2] [INFO] Booting worker with pid: 2
+store reached at localhost:6379
+[2026-11-06 21:35:11 +0000] [3] [INFO] Booting worker with pid: 3
+store reached at localhost:6379
+----
+
+We get the overall management of the application, but we can still operate on specific components if we need to.
+
+== Replace a Piece
+
+Restarting keeps the same container, but what if we had an updated container and needed to replace a component?
+
+A stopped container isn't removed. 
+It's down but not gone.
+We need to remove it in order to replace it.
+
+[source,bash,role=execute]
+----
+podman stop store
+----
+
+[source,bash,role=execute]
+----
+podman rm store
+----
+
+Check the state of our pod without the `store`
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Running     8 minutes ago   c1d2e3f4a5b6  2
+----
+
+Now launch a new `store` container.
+For purposes of the lab, we're using the same image but the outcome would be the same if `latest` here was newer.
+[source,bash,role=execute]
+----
+podman run --pod webapp -d --name store registry.access.redhat.com/hi/valkey:latest
+----
+
+Check that the application is unaffected:
+
+[source,bash,role=execute]
+----
+podman pod ps
+----
+
+[source,text]
+----
+POD ID        NAME        STATUS      CREATED         INFRA ID      # OF CONTAINERS
+7f6e5d4c3b2a  webapp      Running     8 minutes ago   c1d2e3f4a5b6  3
+----
+
+The pod never stopped: the new `store` container joined the pod and the webapp found it the way it found the old one.
+
+Reload http://webcounter-{guid}.{domain}/[*the web counter*^] in your browser.
+The count resets to 1.
+
+image::webcounter-replace.png[]
+
+The state lived in the container that was replaced. 
+The pod kept running, but the data in the original container was lost.
+
+== Take the Application Down
+
+The whole application comes down the way it went up — one pod, one command:
+
+[source,bash,role=execute]
+----
+podman pod stop webapp && podman pod rm webapp
+----
+
+Grouping containers in logical units gives us a useful way to treat them as a single application.
+We've only done the basics of pod management in this lab, but this can make managing containerized applications comprised of multiple components much easier.
+Communication via shared namespace is one benefit, but resource controls can also be set once instead of for each container.
+
+With containers grouped together, creating system services from them becomes a lot easier as well.
+Check out our other labs to see how `quadlets` can quickly take your pods into services and how they lend themselves to automation.

@@ -12,3 +12,16 @@ virtualmachines:
         value: "bastions"
     networks:
       - default
+    services:
+      - name: webcounter
+        ports:
+          - port: 8000
+            protocol: TCP
+            targetPort: 8000
+            name: webcounter
+    routes:
+      - name: webcounter
+        host: webcounter
+        service: webcounter
+        targetPort: 8000
+        tls: false

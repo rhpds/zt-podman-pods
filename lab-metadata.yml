@@ -7,17 +7,15 @@ lab:
   maintainer: "Nate Lager (nlager@redhat.com)" 
   
   description:
-    summary: "Learn how to create and manage Podman Pods"
-    goal: "After completing this scenario users will be able to create podman pods, create containers within those pods, and forward ports to the services those containers run."
+    summary: "Learn how to deploy a multi-service application as one unit via podman pods"
+    goal: "Users leave this hands-on scenario running a multi-service application as a single pod, understanding how to connect dependent containers, publish ports, and manage the lifecycle of the entire application as well as components."
     concepts:
-      - Verify whether podman is installed on the system
-      - Create a pod in podman
-      - Run a container inside of a pod in podman
-      - Forward ports to containers within pods.
-      - Creating kubelet definitions from podman pods for easyier re-deployment
-      - Operationalizing a podman pod through systemd with Quadlet
-    use_case: "Create and Manage Podman Pods"
-    time_to_complete: "10"
+      - "Run containers inside a pod"
+      - "Publish ports at the pod level"
+      - "User-defined networks and name-based DNS"
+      - "Persistent volumes that outlive containers"
+    use_case: "Deploy multi-service container applications as a single pod"
+    time_to_complete: "20"
     
   git_ref:
     production: "main"
