@@ -7,18 +7,15 @@ lab:
   maintainer: "Nate Lager (nlager@redhat.com)" 
   
   description:
-    summary: "Learn how to group containers into Podman Pods and deploy a multi-service application as one unit"
-    goal: "Users leave this hands-on scenario with knowledge they can apply to their own container workloads: running a multi-service application as a single pod, letting its pieces talk over shared localhost, publishing only the ports that need to be reachable, connecting dependent services by name on a user-defined network, and keeping service data alive across container replacement."
+    summary: "Learn how to deploy a multi-service application as one unit via podman pods"
+    goal: "Users leave this hands-on scenario running a multi-service application as a single pod, understanding how to connect dependent containers, publish ports, and manage the lifecycle of the entire application as well as components."
     concepts:
-      - "Create a pod in podman"
       - "Run containers inside a pod"
-      - "The infra container and pod networking"
       - "Publish ports at the pod level"
-      - "Configure containers via mounted files"
       - "User-defined networks and name-based DNS"
       - "Persistent volumes that outlive containers"
     use_case: "Deploy multi-service container applications as a single pod"
-    time_to_complete: "30"
+    time_to_complete: "20"
     
   git_ref:
     production: "main"
